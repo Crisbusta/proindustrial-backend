@@ -87,11 +87,13 @@ type Company struct {
 }
 
 type User struct {
-	ID           string    `db:"id"`
-	Email        string    `db:"email"`
-	PasswordHash string    `db:"password_hash"`
-	CompanyID    string    `db:"company_id"`
-	CreatedAt    time.Time `db:"created_at"`
+	ID                 string     `db:"id" json:"id"`
+	Email              string     `db:"email" json:"email"`
+	PasswordHash       string     `db:"password_hash" json:"-"`
+	CompanyID          NullString `db:"company_id" json:"companyId"`
+	Role               string     `db:"role" json:"role"`
+	MustChangePassword bool       `db:"must_change_password" json:"mustChangePassword"`
+	CreatedAt          time.Time  `db:"created_at" json:"createdAt"`
 }
 
 type QuoteRequest struct {

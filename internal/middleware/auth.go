@@ -10,8 +10,9 @@ import (
 
 const UserIDKey = "userID"
 const CompanyIDKey = "companyID"
+const RoleKey = "role"
 
-func Auth(jwtSecret string) gin.HandlerFunc {
+func Auth(jwtSecret string, allowedRoles ...string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		header := c.GetHeader("Authorization")
 		if !strings.HasPrefix(header, "Bearer ") {
@@ -37,8 +38,37 @@ func Auth(jwtSecret string) gin.HandlerFunc {
 			return
 		}
 
-		c.Set(UserIDKey, claims["sub"])
-		c.Set(CompanyIDKey, claims["companyId"])
+		userID, ok := claims["sub"].(string)
+		if !ok || userID == "" {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid user id"})
+			return
+		}
+
+		role, ok := claims["role"].(string)
+		if !ok || role == "" {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid role"})
+			return
+		}
+
+		if len(allowedRoles) > 0 {
+			allowed := false
+			for _, candidate := range allowedRoles {
+				if role == candidate {
+					allowed = true
+					break
+				}
+			}
+			if !allowed {
+				c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "forbidden"})
+				return
+			}
+		}
+
+		c.Set(UserIDKey, userID)
+		c.Set(RoleKey, role)
+		if companyID, ok := claims["companyId"].(string); ok && companyID != "" {
+			c.Set(CompanyIDKey, companyID)
+		}
 		c.Next()
 	}
 }

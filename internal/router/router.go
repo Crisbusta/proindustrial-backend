@@ -12,6 +12,7 @@ type Deps struct {
 	Quote        *handler.QuoteHandler
 	Registration *handler.RegistrationHandler
 	Panel        *handler.PanelHandler
+	Admin        *handler.AdminHandler
 	JWTSecret    string
 	CORSOrigin   string
 }
@@ -32,10 +33,11 @@ func Setup(deps Deps) *gin.Engine {
 
 	// Auth
 	api.POST("/auth/login", deps.Auth.Login)
-	api.GET("/auth/me", middleware.Auth(deps.JWTSecret), deps.Auth.Me)
+	api.GET("/auth/me", middleware.Auth(deps.JWTSecret, "provider"), deps.Auth.Me)
+	api.POST("/auth/change-password", middleware.Auth(deps.JWTSecret, "provider"), deps.Auth.ChangePassword)
 
 	// Panel (protected)
-	panel := api.Group("/panel", middleware.Auth(deps.JWTSecret))
+	panel := api.Group("/panel", middleware.Auth(deps.JWTSecret, "provider"))
 	panel.GET("/dashboard/stats", deps.Panel.DashboardStats)
 	panel.GET("/quotes", deps.Quote.List)
 	panel.PATCH("/quotes/:id", deps.Quote.UpdateStatus)
@@ -45,6 +47,17 @@ func Setup(deps Deps) *gin.Engine {
 	panel.DELETE("/services/:id", deps.Panel.DeleteService)
 	panel.GET("/profile", deps.Panel.GetProfile)
 	panel.PUT("/profile", deps.Panel.UpdateProfile)
+
+	// Admin
+	adminAuth := api.Group("/admin/auth")
+	adminAuth.POST("/login", deps.Auth.AdminLogin)
+	adminAuth.GET("/me", middleware.Auth(deps.JWTSecret, "admin"), deps.Auth.AdminMe)
+
+	admin := api.Group("/admin", middleware.Auth(deps.JWTSecret, "admin"))
+	admin.GET("/registrations", deps.Admin.ListRegistrations)
+	admin.GET("/registrations/:id", deps.Admin.GetRegistration)
+	admin.POST("/registrations/:id/approve", deps.Admin.ApproveRegistration)
+	admin.POST("/registrations/:id/reject", deps.Admin.RejectRegistration)
 
 	return r
 }

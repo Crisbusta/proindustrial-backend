@@ -23,7 +23,7 @@ services:
       DATABASE_URL: postgres://proindustrial:${DB_PASSWORD:-devpassword}@db:5432/proindustrial?sslmode=disable
       JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me}
       PORT: 8080
-      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:5173}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3001}
     depends_on:
       db:
         condition: service_healthy
