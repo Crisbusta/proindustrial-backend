@@ -1,0 +1,281 @@
+{
+  "info": {
+    "name": "ProIndustrial Public API",
+    "description": "API endpoints for ProIndustrial B2B marketplace. Run the Auth/Login request first — it auto-saves the JWT token for Panel requests.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://localhost:8080", "type": "string" },
+    { "key": "jwt_token", "value": "", "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "Public",
+      "item": [
+        {
+          "name": "List category groups",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/category-groups",
+            "description": "Returns the full category tree (Termofusión + Geomembranas) with subcategories."
+          }
+        },
+        {
+          "name": "List regions",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/regions"
+          }
+        },
+        {
+          "name": "List all companies",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/companies"
+          }
+        },
+        {
+          "name": "Filter by category (termofusion)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/companies?category=termofusion",
+              "host": ["{{base_url}}"],
+              "path": ["api", "companies"],
+              "query": [{ "key": "category", "value": "termofusion" }]
+            }
+          }
+        },
+        {
+          "name": "Filter by category (geomembranas)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/companies?category=geomembranas",
+              "host": ["{{base_url}}"],
+              "path": ["api", "companies"],
+              "query": [{ "key": "category", "value": "geomembranas" }]
+            }
+          }
+        },
+        {
+          "name": "Filter by region (Antofagasta)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/companies?region=Antofagasta",
+              "host": ["{{base_url}}"],
+              "path": ["api", "companies"],
+              "query": [{ "key": "region", "value": "Antofagasta" }]
+            }
+          }
+        },
+        {
+          "name": "Filter featured companies",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/companies?featured=true",
+              "host": ["{{base_url}}"],
+              "path": ["api", "companies"],
+              "query": [{ "key": "featured", "value": "true" }]
+            }
+          }
+        },
+        {
+          "name": "Get company by slug",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/companies/proveedora-aceros-pacifico"
+          }
+        },
+        {
+          "name": "Submit quote request",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/quotes",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"requesterName\": \"Juan Pérez\",\n  \"requesterCompany\": \"Minera Ejemplo\",\n  \"requesterEmail\": \"juan@ejemplo.cl\",\n  \"requesterPhone\": \"+56 9 1234 5678\",\n  \"service\": \"Termofusión PEAD\",\n  \"description\": \"Necesitamos instalar 500m de tubería PEAD DN160 para riego.\",\n  \"location\": \"Antofagasta\",\n  \"targetCompanyId\": \"\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Register provider",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/registrations",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"companyName\": \"Nueva Empresa SpA\",\n  \"email\": \"contacto@nuevaempresa.cl\",\n  \"phone\": \"+56 9 8765 4321\",\n  \"region\": \"Antofagasta\",\n  \"services\": [\"termofusion\", \"tuberias-industriales\"],\n  \"description\": \"Empresa con 10 años de experiencia en termofusión.\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.token) {",
+                  "  pm.collectionVariables.set('jwt_token', res.token);",
+                  "  console.log('JWT token saved:', res.token.substring(0, 20) + '...');",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/auth/login",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"contacto@acerospacifico.cl\",\n  \"password\": \"demo123\"\n}"
+            },
+            "description": "Login with any seed company email and password 'demo123'. Automatically saves JWT to collection variable {{jwt_token}}."
+          }
+        },
+        {
+          "name": "Get current user (me)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/auth/me",
+            "header": [{ "key": "Authorization", "value": "Bearer {{jwt_token}}" }],
+            "description": "Validates token and returns authenticated user + company info."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Panel",
+      "description": "All requests require Bearer {{jwt_token}}. Run Auth/Login first.",
+      "item": [
+        {
+          "name": "Dashboard stats",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/panel/dashboard/stats",
+            "header": [{ "key": "Authorization", "value": "Bearer {{jwt_token}}" }]
+          }
+        },
+        {
+          "name": "List quotes",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/panel/quotes",
+            "header": [{ "key": "Authorization", "value": "Bearer {{jwt_token}}" }]
+          }
+        },
+        {
+          "name": "List quotes (status=new)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/panel/quotes?status=new",
+              "host": ["{{base_url}}"],
+              "path": ["api", "panel", "quotes"],
+              "query": [{ "key": "status", "value": "new" }]
+            },
+            "header": [{ "key": "Authorization", "value": "Bearer {{jwt_token}}" }]
+          }
+        },
+        {
+          "name": "Update quote status",
+          "request": {
+            "method": "PATCH",
+            "url": "{{base_url}}/api/panel/quotes/QUOTE_ID_HERE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{jwt_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"read\"\n}"
+            },
+            "description": "status: new | read | responded"
+          }
+        },
+        {
+          "name": "List services",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/panel/services",
+            "header": [{ "key": "Authorization", "value": "Bearer {{jwt_token}}" }]
+          }
+        },
+        {
+          "name": "Create service",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/panel/services",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{jwt_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Inspección de soldaduras\",\n  \"category\": \"termofusion\",\n  \"description\": \"Inspección visual y ensayo de hermeticidad de uniones termofundidas.\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Update service",
+          "request": {
+            "method": "PATCH",
+            "url": "{{base_url}}/api/panel/services/SERVICE_ID_HERE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{jwt_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Inspección de soldaduras actualizada\",\n  \"status\": \"active\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Delete service",
+          "request": {
+            "method": "DELETE",
+            "url": "{{base_url}}/api/panel/services/SERVICE_ID_HERE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{jwt_token}}" }]
+          }
+        },
+        {
+          "name": "Get profile",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/panel/profile",
+            "header": [{ "key": "Authorization", "value": "Bearer {{jwt_token}}" }]
+          }
+        },
+        {
+          "name": "Update profile",
+          "request": {
+            "method": "PUT",
+            "url": "{{base_url}}/api/panel/profile",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{jwt_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tagline\": \"Especialistas en termofusión y tuberías PEAD\",\n  \"phone\": \"+56 55 234 5678\",\n  \"website\": \"https://acerospacifico.cl\"\n}"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
