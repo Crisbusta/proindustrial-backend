@@ -1,10 +1,14 @@
 package notify
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"log"
+	"net/http"
 	"net/smtp"
 	"strings"
+	"time"
 
 	"github.com/crisbusta/proindustrial-backend-public/internal/config"
 )
@@ -38,11 +42,15 @@ Contraseña inicial: %s
 Por seguridad, al ingresar deberás cambiar tu contraseña inmediatamente.
 `, companyName, strings.TrimRight(m.cfg.AppBaseURL, "/"), to, initialPassword))
 
+	if m.cfg.ResendAPIKey != "" && m.cfg.ResendFrom != "" {
+		return m.sendViaResend(to, subject, body)
+	}
+
 	if m.cfg.SMTPHost == "" || m.cfg.SMTPFrom == "" {
-		log.Printf("approval email not sent via SMTP; logging instead. to=%s subject=%q body=%q", to, subject, body)
+		log.Printf("approval email not sent; logging instead. to=%s subject=%q body=%q", to, subject, body)
 		return DeliveryResult{
 			Status: "logged",
-			Note:   "SMTP no configurado; el mensaje fue escrito en logs.",
+			Note:   "No hay proveedor de correo configurado; el mensaje fue escrito en logs.",
 		}
 	}
 
@@ -66,4 +74,64 @@ Por seguridad, al ingresar deberás cambiar tu contraseña inmediatamente.
 		Status: "sent",
 		Note:   fmt.Sprintf("Correo enviado a %s.", to),
 	}
+}
+
+func (m *Mailer) sendViaResend(to, subject, textBody string) DeliveryResult {
+	payload := map[string]any{
+		"from":    m.cfg.ResendFrom,
+		"to":      []string{to},
+		"subject": subject,
+		"html":    textToHTML(textBody),
+		"text":    textBody,
+	}
+
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return DeliveryResult{
+			Status: "failed",
+			Note:   fmt.Sprintf("No se pudo serializar el correo: %v", err),
+		}
+	}
+
+	req, err := http.NewRequest(http.MethodPost, "https://api.resend.com/emails", bytes.NewReader(body))
+	if err != nil {
+		return DeliveryResult{
+			Status: "failed",
+			Note:   fmt.Sprintf("No se pudo crear la solicitud a Resend: %v", err),
+		}
+	}
+	req.Header.Set("Authorization", "Bearer "+m.cfg.ResendAPIKey)
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{Timeout: 15 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Printf("approval email send failed via resend: to=%s err=%v", to, err)
+		return DeliveryResult{
+			Status: "failed",
+			Note:   fmt.Sprintf("No se pudo enviar el correo con Resend: %v", err),
+		}
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		log.Printf("approval email send failed via resend: to=%s status=%d", to, resp.StatusCode)
+		return DeliveryResult{
+			Status: "failed",
+			Note:   fmt.Sprintf("Resend respondió con status %d.", resp.StatusCode),
+		}
+	}
+
+	return DeliveryResult{
+		Status: "sent",
+		Note:   fmt.Sprintf("Correo enviado a %s vía Resend.", to),
+	}
+}
+
+func textToHTML(text string) string {
+	escaped := strings.ReplaceAll(text, "&", "&amp;")
+	escaped = strings.ReplaceAll(escaped, "<", "&lt;")
+	escaped = strings.ReplaceAll(escaped, ">", "&gt;")
+	escaped = strings.ReplaceAll(escaped, "\n", "<br />")
+	return fmt.Sprintf("<p>%s</p>", escaped)
 }

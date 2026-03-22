@@ -9,7 +9,7 @@ API pública y backoffice de aprobación para ProIndustrial.
 - Backoffice admin para aprobar o rechazar registros de nuevas empresas
 - Alta automática de `company` + `user` al aprobar
 - Cambio obligatorio de contraseña en el primer login del proveedor
-- Envío opcional de correo de activación por SMTP
+- Envío opcional de correo de activación por Resend API o SMTP
 
 ## Requisitos
 
@@ -23,6 +23,8 @@ API pública y backoffice de aprobación para ProIndustrial.
 - `PORT`
 - `CORS_ORIGIN`
 - `APP_BASE_URL`
+- `RESEND_API_KEY`
+- `RESEND_FROM`
 - `SMTP_HOST`
 - `SMTP_PORT`
 - `SMTP_USER`
@@ -97,4 +99,6 @@ Proveedor demo:
 4. El backend crea la empresa y el usuario proveedor.
 5. El proveedor recibe contraseña temporal `demo123`.
 6. En el primer login debe cambiarla antes de usar el panel.
-7. Si SMTP está configurado, se envía correo automático; si no, el mensaje queda en logs.
+7. Si `RESEND_API_KEY` y `RESEND_FROM` están configurados, el correo sale por Resend.
+8. Si Resend no está configurado pero SMTP sí, usa SMTP.
+9. Si no hay proveedor de correo configurado, el mensaje queda en logs.
