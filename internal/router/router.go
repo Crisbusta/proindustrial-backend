@@ -58,6 +58,7 @@ func Setup(deps Deps) *gin.Engine {
 	admin.GET("/registrations/:id", deps.Admin.GetRegistration)
 	admin.POST("/registrations/:id/approve", deps.Admin.ApproveRegistration)
 	admin.POST("/registrations/:id/reject", deps.Admin.RejectRegistration)
+	admin.DELETE("/registrations/:id/company", deps.Admin.DeleteApprovedCompany)
 
 	return r
 }

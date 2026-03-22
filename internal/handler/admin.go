@@ -86,3 +86,20 @@ func (h *AdminHandler) RejectRegistration(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{"data": reg})
 }
+
+func (h *AdminHandler) DeleteApprovedCompany(c *gin.Context) {
+	err := h.repo.DeleteApprovedCompanyByRegistration(c.Param("id"))
+	if err != nil {
+		switch {
+		case errors.Is(err, repository.ErrRegistrationNotFound):
+			c.JSON(http.StatusNotFound, gin.H{"error": "registration not found"})
+		case errors.Is(err, repository.ErrApprovedCompanyNotFound):
+			c.JSON(http.StatusConflict, gin.H{"error": "approved company not found for this registration"})
+		default:
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		}
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"ok": true})
+}

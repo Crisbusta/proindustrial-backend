@@ -15,6 +15,7 @@ var (
 	ErrRegistrationNotFound    = errors.New("registration not found")
 	ErrRegistrationAlreadyDone = errors.New("registration already processed")
 	ErrRegistrationEmailInUse  = errors.New("registration email already in use")
+	ErrApprovedCompanyNotFound = errors.New("approved company not found")
 	nonSlugCharPattern         = regexp.MustCompile(`[^a-z0-9]+`)
 )
 
@@ -162,6 +163,42 @@ func (r *AdminRepo) RejectRegistration(id string) (*model.ProviderRegistration, 
 		return nil, ErrRegistrationAlreadyDone
 	}
 	return &reg, nil
+}
+
+func (r *AdminRepo) DeleteApprovedCompanyByRegistration(id string) error {
+	tx, err := r.db.Beginx()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	var reg model.ProviderRegistration
+	if err := tx.Get(&reg, `SELECT * FROM provider_registrations WHERE id = $1 FOR UPDATE`, id); err != nil {
+		return ErrRegistrationNotFound
+	}
+	if reg.Status != "approved" {
+		return ErrApprovedCompanyNotFound
+	}
+
+	var companyID string
+	if err := tx.Get(&companyID, `SELECT id FROM companies WHERE email = $1`, reg.Email); err != nil {
+		return ErrApprovedCompanyNotFound
+	}
+
+	if _, err := tx.Exec(`DELETE FROM quote_requests WHERE target_company_id = $1`, companyID); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`DELETE FROM users WHERE email = $1`, reg.Email); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`DELETE FROM companies WHERE id = $1`, companyID); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`DELETE FROM provider_registrations WHERE id = $1`, id); err != nil {
+		return err
+	}
+
+	return tx.Commit()
 }
 
 func nextCompanySlug(tx *sqlx.Tx, companyName string) (string, error) {
