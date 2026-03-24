@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"log"
 	"net/http"
 	"time"
 
@@ -27,7 +28,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		Password string `json:"password" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&body); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "correo y contraseña son requeridos"})
 		return
 	}
 
@@ -49,7 +50,7 @@ func (h *AuthHandler) ChangePassword(c *gin.Context) {
 		NewPassword     string `json:"newPassword" binding:"required,min=8"`
 	}
 	if err := c.ShouldBindJSON(&body); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "contraseña actual y nueva son requeridas (mínimo 8 caracteres)"})
 		return
 	}
 
@@ -66,16 +67,36 @@ func (h *AuthHandler) ChangePassword(c *gin.Context) {
 
 	passwordHash, err := bcrypt.GenerateFromPassword([]byte(body.NewPassword), bcrypt.DefaultCost)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not update password"})
+		log.Printf("ChangePassword bcrypt error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "error interno del servidor"})
 		return
 	}
 
 	if err := h.authRepo.ChangePassword(user.ID, string(passwordHash)); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not update password"})
+		log.Printf("ChangePassword repo error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "error interno del servidor"})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"ok": true})
+	// Issue a fresh token with mustChangePassword = false
+	newClaims := jwt.MapClaims{
+		"sub":                user.ID,
+		"role":               user.Role,
+		"exp":                time.Now().Add(72 * time.Hour).Unix(),
+		"mustChangePassword": false,
+	}
+	if user.CompanyID.Valid {
+		newClaims["companyId"] = user.CompanyID.String
+	}
+	newToken := jwt.NewWithClaims(jwt.SigningMethodHS256, newClaims)
+	newTokenStr, err := newToken.SignedString([]byte(h.jwtSecret))
+	if err != nil {
+		log.Printf("ChangePassword token sign error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "error interno del servidor"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"ok": true, "token": newTokenStr})
 }
 
 func (h *AuthHandler) AdminLogin(c *gin.Context) {
@@ -84,7 +105,7 @@ func (h *AuthHandler) AdminLogin(c *gin.Context) {
 		Password string `json:"password" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&body); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "correo y contraseña son requeridos"})
 		return
 	}
 
@@ -116,9 +137,10 @@ func (h *AuthHandler) login(email, password, expectedRole string) (gin.H, *login
 	}
 
 	claims := jwt.MapClaims{
-		"sub":  user.ID,
-		"role": user.Role,
-		"exp":  time.Now().Add(72 * time.Hour).Unix(),
+		"sub":                user.ID,
+		"role":               user.Role,
+		"exp":                time.Now().Add(72 * time.Hour).Unix(),
+		"mustChangePassword": user.MustChangePassword,
 	}
 	if user.CompanyID.Valid {
 		claims["companyId"] = user.CompanyID.String
@@ -127,7 +149,8 @@ func (h *AuthHandler) login(email, password, expectedRole string) (gin.H, *login
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	tokenStr, err := token.SignedString([]byte(h.jwtSecret))
 	if err != nil {
-		return nil, &loginError{status: http.StatusInternalServerError, message: "could not generate token"}
+		log.Printf("login token sign error: %v", err)
+		return nil, &loginError{status: http.StatusInternalServerError, message: "error interno del servidor"}
 	}
 
 	response := gin.H{

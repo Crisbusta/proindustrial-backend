@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"log"
 	"net/http"
 
 	"github.com/crisbusta/proindustrial-backend-public/internal/middleware"
@@ -28,7 +29,7 @@ func (h *QuoteHandler) Create(c *gin.Context) {
 		TargetCompanyID  string `json:"targetCompanyId"`
 	}
 	if err := c.ShouldBindJSON(&body); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "nombre, correo y servicio son requeridos"})
 		return
 	}
 
@@ -43,7 +44,8 @@ func (h *QuoteHandler) Create(c *gin.Context) {
 		TargetCompanyID:  body.TargetCompanyID,
 	})
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		log.Printf("Quote.Create error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "error interno del servidor"})
 		return
 	}
 	c.JSON(http.StatusCreated, gin.H{"data": q})
@@ -55,7 +57,8 @@ func (h *QuoteHandler) List(c *gin.Context) {
 
 	quotes, err := h.repo.ListByCompany(companyID, status)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		log.Printf("Quote.List error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "error interno del servidor"})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"data": quotes})

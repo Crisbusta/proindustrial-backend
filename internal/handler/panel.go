@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"log"
 	"net/http"
 
 	"github.com/crisbusta/proindustrial-backend-public/internal/middleware"
@@ -24,13 +25,15 @@ func (h *PanelHandler) DashboardStats(c *gin.Context) {
 
 	stats, err := h.quoteRepo.Stats(companyID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		log.Printf("DashboardStats quoteRepo error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "error interno del servidor"})
 		return
 	}
 
 	totalServices, err := h.serviceRepo.Count(companyID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		log.Printf("DashboardStats serviceRepo error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "error interno del servidor"})
 		return
 	}
 	stats.TotalServices = totalServices
@@ -64,7 +67,7 @@ func (h *PanelHandler) UpdateProfile(c *gin.Context) {
 		YearsActive *int     `json:"yearsActive"`
 	}
 	if err := c.ShouldBindJSON(&body); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "datos de perfil inválidos"})
 		return
 	}
 
@@ -80,12 +83,13 @@ func (h *PanelHandler) UpdateProfile(c *gin.Context) {
 	if body.YearsActive != nil { fields["years_active"] = *body.YearsActive }
 
 	if len(fields) == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "no fields to update"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "no hay campos para actualizar"})
 		return
 	}
 
 	if err := h.companyRepo.Update(companyID, fields); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		log.Printf("UpdateProfile error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "error interno del servidor"})
 		return
 	}
 
@@ -98,7 +102,8 @@ func (h *PanelHandler) ListServices(c *gin.Context) {
 	companyID := c.GetString(middleware.CompanyIDKey)
 	services, err := h.serviceRepo.List(companyID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		log.Printf("ListServices error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "error interno del servidor"})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"data": services})
@@ -113,7 +118,7 @@ func (h *PanelHandler) CreateService(c *gin.Context) {
 		Description string `json:"description"`
 	}
 	if err := c.ShouldBindJSON(&body); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "nombre del servicio es requerido"})
 		return
 	}
 
@@ -123,7 +128,8 @@ func (h *PanelHandler) CreateService(c *gin.Context) {
 		Description: body.Description,
 	})
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		log.Printf("CreateService error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "error interno del servidor"})
 		return
 	}
 	c.JSON(http.StatusCreated, gin.H{"data": s})
@@ -140,7 +146,7 @@ func (h *PanelHandler) UpdateService(c *gin.Context) {
 		Status      *string `json:"status"`
 	}
 	if err := c.ShouldBindJSON(&body); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "datos de servicio inválidos"})
 		return
 	}
 

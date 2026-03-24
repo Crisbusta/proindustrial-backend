@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"log"
 	"net/http"
 
 	"github.com/crisbusta/proindustrial-backend-public/internal/repository"
@@ -25,7 +26,7 @@ func (h *RegistrationHandler) Create(c *gin.Context) {
 		Description string   `json:"description"`
 	}
 	if err := c.ShouldBindJSON(&body); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "nombre de empresa y correo son requeridos"})
 		return
 	}
 
@@ -38,7 +39,8 @@ func (h *RegistrationHandler) Create(c *gin.Context) {
 		Description: body.Description,
 	})
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		log.Printf("Registration.Create error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "error interno del servidor"})
 		return
 	}
 	c.JSON(http.StatusCreated, gin.H{"data": reg})

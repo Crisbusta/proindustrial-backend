@@ -20,6 +20,7 @@ type Deps struct {
 func Setup(deps Deps) *gin.Engine {
 	r := gin.Default()
 	r.Use(middleware.CORS(deps.CORSOrigin))
+	r.Use(middleware.Security())
 
 	api := r.Group("/api")
 

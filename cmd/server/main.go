@@ -32,7 +32,7 @@ func main() {
 	quoteHandler := handler.NewQuoteHandler(quoteRepo)
 	registrationHandler := handler.NewRegistrationHandler(registrationRepo)
 	panelHandler := handler.NewPanelHandler(serviceRepo, quoteRepo, companyRepo)
-	adminHandler := handler.NewAdminHandler(adminRepo, mailer)
+	adminHandler := handler.NewAdminHandler(adminRepo, mailer, cfg.InitialPassword)
 
 	r := router.Setup(router.Deps{
 		Company:      companyHandler,

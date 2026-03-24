@@ -8,6 +8,12 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
+// Routes exempt from the mustChangePassword check
+var passwordChangeExemptRoutes = map[string]bool{
+	"/api/auth/change-password": true,
+	"/api/auth/me":              true,
+}
+
 const UserIDKey = "userID"
 const CompanyIDKey = "companyID"
 const RoleKey = "role"
@@ -69,6 +75,14 @@ func Auth(jwtSecret string, allowedRoles ...string) gin.HandlerFunc {
 		if companyID, ok := claims["companyId"].(string); ok && companyID != "" {
 			c.Set(CompanyIDKey, companyID)
 		}
+
+		if mustChange, ok := claims["mustChangePassword"].(bool); ok && mustChange {
+			if !passwordChangeExemptRoutes[c.FullPath()] {
+				c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "debe cambiar su contraseña antes de continuar"})
+				return
+			}
+		}
+
 		c.Next()
 	}
 }
