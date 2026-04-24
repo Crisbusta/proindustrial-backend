@@ -29,6 +29,7 @@ func Setup(deps Deps) *gin.Engine {
 	api.GET("/regions", handler.GetRegions)
 	api.GET("/companies", deps.Company.List)
 	api.GET("/companies/:slug", deps.Company.GetBySlug)
+	api.GET("/companies/:slug/services", deps.Company.ListServices)
 	api.POST("/quotes", deps.Quote.Create)
 	api.POST("/registrations", deps.Registration.Create)
 
@@ -42,6 +43,8 @@ func Setup(deps Deps) *gin.Engine {
 	panel.GET("/dashboard/stats", deps.Panel.DashboardStats)
 	panel.GET("/quotes", deps.Quote.List)
 	panel.PATCH("/quotes/:id", deps.Quote.UpdateStatus)
+	panel.POST("/quotes/:id/reply", deps.Quote.Reply)
+	panel.POST("/quotes/:id/close", deps.Quote.Close)
 	panel.GET("/services", deps.Panel.ListServices)
 	panel.POST("/services", deps.Panel.CreateService)
 	panel.PATCH("/services/:id", deps.Panel.UpdateService)

@@ -63,6 +63,38 @@ func (r *QuoteRepo) ListByCompany(companyID, status string) ([]model.QuoteReques
 	return quotes, err
 }
 
+var validOutcomes = map[string]bool{
+	"won": true, "negotiating": true, "lost_price": true,
+	"lost_other": true, "no_response": true, "cancelled": true, "no_capacity": true,
+}
+
+func (r *QuoteRepo) SetOutcome(id, companyID, outcome, note string) (*model.QuoteRequest, error) {
+	if !validOutcomes[outcome] {
+		return nil, fmt.Errorf("invalid outcome")
+	}
+	var q model.QuoteRequest
+	err := r.db.QueryRowx(`
+		UPDATE quote_requests
+		SET outcome = $1, outcome_note = $2, closed_at = NOW()
+		WHERE id = $3 AND target_company_id = $4
+		RETURNING *`,
+		outcome, nullableStr(note), id, companyID,
+	).StructScan(&q)
+	return &q, err
+}
+
+func (r *QuoteRepo) SetReply(id, companyID, note string) (*model.QuoteRequest, error) {
+	var q model.QuoteRequest
+	err := r.db.QueryRowx(`
+		UPDATE quote_requests
+		SET reply_note = $1, replied_at = NOW(), status = 'responded'
+		WHERE id = $2 AND target_company_id = $3
+		RETURNING *`,
+		note, id, companyID,
+	).StructScan(&q)
+	return &q, err
+}
+
 func (r *QuoteRepo) UpdateStatus(id, companyID, status string) error {
 	res, err := r.db.Exec(
 		`UPDATE quote_requests SET status = $1 WHERE id = $2 AND target_company_id = $3`,

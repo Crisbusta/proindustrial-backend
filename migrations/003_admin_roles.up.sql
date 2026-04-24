@@ -25,7 +25,7 @@ END $$;
 
 INSERT INTO users (email, password_hash, company_id, role)
 VALUES (
-  'admin@proindustrial.local',
+  'admin@puntofusion.local',
   '$2a$10$r1zFxutzHJAHUYG.5UCOdeh4AyJru1vWjfhG3sklvd9Ml0JTILRWy',
   NULL,
   'admin'

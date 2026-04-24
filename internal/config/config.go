@@ -30,7 +30,7 @@ func Load() Config {
 	}
 
 	return Config{
-		DatabaseURL:     getEnv("DATABASE_URL", "postgres://proindustrial:devpassword@localhost:5432/proindustrial?sslmode=disable"),
+		DatabaseURL:     getEnv("DATABASE_URL", "postgres://puntofusion:devpassword@localhost:5432/puntofusion?sslmode=disable"),
 		JWTSecret:       jwtSecret,
 		InitialPassword: getEnv("INITIAL_PASSWORD", ""),
 		Port:            getEnv("PORT", "8080"),

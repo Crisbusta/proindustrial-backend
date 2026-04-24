@@ -8,11 +8,12 @@ import (
 )
 
 type CompanyHandler struct {
-	repo *repository.CompanyRepo
+	repo        *repository.CompanyRepo
+	serviceRepo *repository.ServiceRepo
 }
 
-func NewCompanyHandler(repo *repository.CompanyRepo) *CompanyHandler {
-	return &CompanyHandler{repo: repo}
+func NewCompanyHandler(repo *repository.CompanyRepo, serviceRepo *repository.ServiceRepo) *CompanyHandler {
+	return &CompanyHandler{repo: repo, serviceRepo: serviceRepo}
 }
 
 func (h *CompanyHandler) List(c *gin.Context) {
@@ -44,4 +45,19 @@ func (h *CompanyHandler) GetBySlug(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"data": company})
+}
+
+func (h *CompanyHandler) ListServices(c *gin.Context) {
+	slug := c.Param("slug")
+	company, err := h.repo.GetBySlug(slug)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "company not found"})
+		return
+	}
+	services, err := h.serviceRepo.ListActive(company.ID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "error interno del servidor"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": services})
 }

@@ -27,9 +27,9 @@ func main() {
 	adminRepo := repository.NewAdminRepo(db)
 
 	// Handlers
-	companyHandler := handler.NewCompanyHandler(companyRepo)
+	companyHandler := handler.NewCompanyHandler(companyRepo, serviceRepo)
 	authHandler := handler.NewAuthHandler(authRepo, companyRepo, cfg.JWTSecret)
-	quoteHandler := handler.NewQuoteHandler(quoteRepo)
+	quoteHandler := handler.NewQuoteHandler(quoteRepo, companyRepo, mailer)
 	registrationHandler := handler.NewRegistrationHandler(registrationRepo)
 	panelHandler := handler.NewPanelHandler(serviceRepo, quoteRepo, companyRepo)
 	adminHandler := handler.NewAdminHandler(adminRepo, mailer, cfg.InitialPassword)

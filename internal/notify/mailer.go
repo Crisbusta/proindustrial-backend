@@ -27,11 +27,11 @@ func NewMailer(cfg config.Config) *Mailer {
 }
 
 func (m *Mailer) SendApprovalEmail(to, companyName, initialPassword string) DeliveryResult {
-	subject := "Tu empresa fue aprobada en ProIndustrial"
+	subject := "Tu empresa fue aprobada en PuntoFusión"
 	body := strings.TrimSpace(fmt.Sprintf(`
 Hola,
 
-Tu empresa %s fue aprobada en ProIndustrial.
+Tu empresa %s fue aprobada en PuntoFusión.
 
 Ya puedes ingresar al panel en:
 %s/panel/login
@@ -74,6 +74,40 @@ Por seguridad, al ingresar deberás cambiar tu contraseña inmediatamente.
 		Status: "sent",
 		Note:   fmt.Sprintf("Correo enviado a %s.", to),
 	}
+}
+
+func (m *Mailer) SendQuoteReply(to, requesterName, companyName, service, replyText string) DeliveryResult {
+	subject := fmt.Sprintf("Respuesta a tu solicitud: %s", service)
+	body := strings.TrimSpace(fmt.Sprintf(`
+Hola %s,
+
+%s ha respondido a tu solicitud de cotización para "%s":
+
+%s
+
+Si tienes dudas adicionales puedes responder directamente a este correo.
+
+— El equipo de PuntoFusión
+`, requesterName, companyName, service, replyText))
+
+	if m.cfg.ResendAPIKey != "" && m.cfg.ResendFrom != "" {
+		return m.sendViaResend(to, subject, body)
+	}
+	if m.cfg.SMTPHost == "" || m.cfg.SMTPFrom == "" {
+		log.Printf("quote reply not sent; logging instead. to=%s body=%q", to, body)
+		return DeliveryResult{Status: "logged", Note: "No hay proveedor de correo configurado."}
+	}
+	msg := []byte(fmt.Sprintf("From: %s\r\nTo: %s\r\nSubject: %s\r\n\r\n%s\r\n", m.cfg.SMTPFrom, to, subject, body))
+	addr := fmt.Sprintf("%s:%s", m.cfg.SMTPHost, m.cfg.SMTPPort)
+	var auth smtp.Auth
+	if m.cfg.SMTPUser != "" {
+		auth = smtp.PlainAuth("", m.cfg.SMTPUser, m.cfg.SMTPPass, m.cfg.SMTPHost)
+	}
+	if err := smtp.SendMail(addr, auth, m.cfg.SMTPFrom, []string{to}, msg); err != nil {
+		log.Printf("quote reply send failed: to=%s err=%v", to, err)
+		return DeliveryResult{Status: "failed", Note: fmt.Sprintf("No se pudo enviar: %v", err)}
+	}
+	return DeliveryResult{Status: "sent", Note: fmt.Sprintf("Correo enviado a %s.", to)}
 }
 
 func (m *Mailer) sendViaResend(to, subject, textBody string) DeliveryResult {

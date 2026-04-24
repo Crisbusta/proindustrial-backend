@@ -38,6 +38,15 @@ func (r *ServiceRepo) List(companyID string) ([]model.CompanyService, error) {
 	return services, err
 }
 
+func (r *ServiceRepo) ListActive(companyID string) ([]model.CompanyService, error) {
+	services := []model.CompanyService{}
+	err := r.db.Select(&services,
+		`SELECT * FROM company_services WHERE company_id = $1 AND status = 'active' ORDER BY created_at ASC`,
+		companyID,
+	)
+	return services, err
+}
+
 func (r *ServiceRepo) Create(companyID string, in CreateServiceInput) (*model.CompanyService, error) {
 	var s model.CompanyService
 	err := r.db.QueryRowx(`

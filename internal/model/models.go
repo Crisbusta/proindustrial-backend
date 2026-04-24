@@ -107,6 +107,11 @@ type QuoteRequest struct {
 	Location         NullString `db:"location"          json:"location"`
 	TargetCompanyID  NullString `db:"target_company_id" json:"targetCompanyId"`
 	Status           string     `db:"status"            json:"status"`
+	ReplyNote        NullString `db:"reply_note"        json:"replyNote"`
+	RepliedAt        *time.Time `db:"replied_at"        json:"repliedAt"`
+	Outcome          NullString `db:"outcome"           json:"outcome"`
+	OutcomeNote      NullString `db:"outcome_note"      json:"outcomeNote"`
+	ClosedAt         *time.Time `db:"closed_at"         json:"closedAt"`
 	CreatedAt        time.Time  `db:"created_at"        json:"createdAt"`
 }
 
