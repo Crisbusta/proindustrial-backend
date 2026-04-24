@@ -56,6 +56,7 @@ func Setup(deps Deps) *gin.Engine {
 	adminAuth := api.Group("/admin/auth")
 	adminAuth.POST("/login", deps.Auth.AdminLogin)
 	adminAuth.GET("/me", middleware.Auth(deps.JWTSecret, "admin"), deps.Auth.AdminMe)
+	adminAuth.POST("/change-password", middleware.Auth(deps.JWTSecret, "admin"), deps.Auth.ChangePassword)
 
 	admin := api.Group("/admin", middleware.Auth(deps.JWTSecret, "admin"))
 	admin.GET("/registrations", deps.Admin.ListRegistrations)
