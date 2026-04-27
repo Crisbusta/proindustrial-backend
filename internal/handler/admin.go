@@ -3,7 +3,7 @@ package handler
 import (
 	"crypto/rand"
 	"errors"
-	"log"
+	"log/slog"
 	"math/big"
 	"net/http"
 
@@ -46,7 +46,7 @@ func (h *AdminHandler) ListRegistrations(c *gin.Context) {
 	status := c.Query("status")
 	regs, err := h.repo.ListRegistrations(status)
 	if err != nil {
-		log.Printf("ListRegistrations error: %v", err)
+		slog.Error("ListRegistrations error", "err", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "error interno del servidor"})
 		return
 	}
@@ -67,7 +67,7 @@ func (h *AdminHandler) ApproveRegistration(c *gin.Context) {
 
 	passwordHash, err := bcrypt.GenerateFromPassword([]byte(initialPassword), bcrypt.DefaultCost)
 	if err != nil {
-		log.Printf("ApproveRegistration bcrypt error: %v", err)
+		slog.Error("ApproveRegistration bcrypt error", "err", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "error interno del servidor"})
 		return
 	}
@@ -82,7 +82,7 @@ func (h *AdminHandler) ApproveRegistration(c *gin.Context) {
 		case errors.Is(err, repository.ErrRegistrationEmailInUse):
 			c.JSON(http.StatusConflict, gin.H{"error": "el correo ya está en uso"})
 		default:
-			log.Printf("ApproveRegistration error: %v", err)
+			slog.Error("ApproveRegistration error", "err", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "error interno del servidor"})
 		}
 		return
@@ -106,7 +106,7 @@ func (h *AdminHandler) RejectRegistration(c *gin.Context) {
 		case errors.Is(err, repository.ErrRegistrationAlreadyDone):
 			c.JSON(http.StatusConflict, gin.H{"error": "el registro ya fue procesado"})
 		default:
-			log.Printf("RejectRegistration error: %v", err)
+			slog.Error("RejectRegistration error", "err", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "error interno del servidor"})
 		}
 		return
@@ -123,7 +123,7 @@ func (h *AdminHandler) DeleteApprovedCompany(c *gin.Context) {
 		case errors.Is(err, repository.ErrApprovedCompanyNotFound):
 			c.JSON(http.StatusConflict, gin.H{"error": "empresa aprobada no encontrada para este registro"})
 		default:
-			log.Printf("DeleteApprovedCompany error: %v", err)
+			slog.Error("DeleteApprovedCompany error", "err", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "error interno del servidor"})
 		}
 		return

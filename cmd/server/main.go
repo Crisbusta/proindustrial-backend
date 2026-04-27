@@ -1,11 +1,12 @@
 package main
 
 import (
-	"log"
+	"log/slog"
 
 	"github.com/crisbusta/proindustrial-backend-public/internal/config"
 	"github.com/crisbusta/proindustrial-backend-public/internal/database"
 	"github.com/crisbusta/proindustrial-backend-public/internal/handler"
+	"github.com/crisbusta/proindustrial-backend-public/internal/logger"
 	"github.com/crisbusta/proindustrial-backend-public/internal/notify"
 	"github.com/crisbusta/proindustrial-backend-public/internal/repository"
 	"github.com/crisbusta/proindustrial-backend-public/internal/router"
@@ -13,6 +14,8 @@ import (
 
 func main() {
 	cfg := config.Load()
+	logger.Init(cfg.AppEnv)
+
 	mailer := notify.NewMailer(cfg)
 
 	db := database.Connect(cfg.DatabaseURL)
@@ -33,6 +36,7 @@ func main() {
 	registrationHandler := handler.NewRegistrationHandler(registrationRepo)
 	panelHandler := handler.NewPanelHandler(serviceRepo, quoteRepo, companyRepo)
 	adminHandler := handler.NewAdminHandler(adminRepo, mailer, cfg.InitialPassword)
+	healthHandler := handler.NewHealthHandler(db)
 
 	r := router.Setup(router.Deps{
 		Company:      companyHandler,
@@ -41,12 +45,13 @@ func main() {
 		Registration: registrationHandler,
 		Panel:        panelHandler,
 		Admin:        adminHandler,
+		Health:       healthHandler,
 		JWTSecret:    cfg.JWTSecret,
 		CORSOrigin:   cfg.CORSOrigin,
 	})
 
-	log.Printf("server starting on :%s", cfg.Port)
+	slog.Info("server starting", "port", cfg.Port, "env", cfg.AppEnv)
 	if err := r.Run(":" + cfg.Port); err != nil {
-		log.Fatalf("server failed: %v", err)
+		slog.Error("server failed", "err", err)
 	}
 }

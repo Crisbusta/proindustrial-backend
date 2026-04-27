@@ -1,7 +1,7 @@
 package handler
 
 import (
-	"log"
+	"log/slog"
 	"net/http"
 
 	"github.com/crisbusta/proindustrial-backend-public/internal/repository"
@@ -39,7 +39,7 @@ func (h *RegistrationHandler) Create(c *gin.Context) {
 		Description: body.Description,
 	})
 	if err != nil {
-		log.Printf("Registration.Create error: %v", err)
+		slog.Error("Registration.Create error", "err", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "error interno del servidor"})
 		return
 	}

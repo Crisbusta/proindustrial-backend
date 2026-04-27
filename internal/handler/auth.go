@@ -1,7 +1,7 @@
 package handler
 
 import (
-	"log"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -67,13 +67,13 @@ func (h *AuthHandler) ChangePassword(c *gin.Context) {
 
 	passwordHash, err := bcrypt.GenerateFromPassword([]byte(body.NewPassword), bcrypt.DefaultCost)
 	if err != nil {
-		log.Printf("ChangePassword bcrypt error: %v", err)
+		slog.Error("ChangePassword bcrypt error", "err", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "error interno del servidor"})
 		return
 	}
 
 	if err := h.authRepo.ChangePassword(user.ID, string(passwordHash)); err != nil {
-		log.Printf("ChangePassword repo error: %v", err)
+		slog.Error("ChangePassword repo error", "err", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "error interno del servidor"})
 		return
 	}
@@ -91,7 +91,7 @@ func (h *AuthHandler) ChangePassword(c *gin.Context) {
 	newToken := jwt.NewWithClaims(jwt.SigningMethodHS256, newClaims)
 	newTokenStr, err := newToken.SignedString([]byte(h.jwtSecret))
 	if err != nil {
-		log.Printf("ChangePassword token sign error: %v", err)
+		slog.Error("ChangePassword token sign error", "err", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "error interno del servidor"})
 		return
 	}
@@ -149,7 +149,7 @@ func (h *AuthHandler) login(email, password, expectedRole string) (gin.H, *login
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	tokenStr, err := token.SignedString([]byte(h.jwtSecret))
 	if err != nil {
-		log.Printf("login token sign error: %v", err)
+		slog.Error("login token sign error", "err", err)
 		return nil, &loginError{status: http.StatusInternalServerError, message: "error interno del servidor"}
 	}
 

@@ -8,6 +8,7 @@ import (
 const defaultJWTSecret = "dev-secret-change-me"
 
 type Config struct {
+	AppEnv          string
 	DatabaseURL     string
 	JWTSecret       string
 	InitialPassword string
@@ -24,12 +25,18 @@ type Config struct {
 }
 
 func Load() Config {
+	appEnv := getEnv("APP_ENV", "development")
+
 	jwtSecret := getEnv("JWT_SECRET", defaultJWTSecret)
 	if jwtSecret == defaultJWTSecret {
+		if appEnv == "production" {
+			log.Fatal("FATAL: JWT_SECRET must be set to a secure value in production. Refusing to start.")
+		}
 		log.Println("WARNING: JWT_SECRET is using the default dev value. Set a secure secret in production.")
 	}
 
 	return Config{
+		AppEnv:          appEnv,
 		DatabaseURL:     getEnv("DATABASE_URL", "postgres://puntofusion:devpassword@localhost:5432/puntofusion?sslmode=disable"),
 		JWTSecret:       jwtSecret,
 		InitialPassword: getEnv("INITIAL_PASSWORD", ""),

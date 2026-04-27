@@ -1,7 +1,7 @@
 package handler
 
 import (
-	"log"
+	"log/slog"
 	"net/http"
 
 	"github.com/crisbusta/proindustrial-backend-public/internal/middleware"
@@ -47,7 +47,7 @@ func (h *QuoteHandler) Create(c *gin.Context) {
 		TargetCompanyID:  body.TargetCompanyID,
 	})
 	if err != nil {
-		log.Printf("Quote.Create error: %v", err)
+		slog.Error("Quote.Create error", "err", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "error interno del servidor"})
 		return
 	}
@@ -60,7 +60,7 @@ func (h *QuoteHandler) List(c *gin.Context) {
 
 	quotes, err := h.repo.ListByCompany(companyID, status)
 	if err != nil {
-		log.Printf("Quote.List error: %v", err)
+		slog.Error("Quote.List error", "err", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "error interno del servidor"})
 		return
 	}
@@ -116,7 +116,7 @@ func (h *QuoteHandler) Reply(c *gin.Context) {
 			companyName = company.Name
 		}
 		delivery := h.mailer.SendQuoteReply(q.RequesterEmail, q.RequesterName, companyName, q.Service, body.Note)
-		log.Printf("quote reply email: to=%s status=%s note=%s", q.RequesterEmail, delivery.Status, delivery.Note)
+		slog.Info("quote reply email sent", "to", q.RequesterEmail, "status", delivery.Status)
 	}
 
 	c.JSON(http.StatusOK, gin.H{"data": q})

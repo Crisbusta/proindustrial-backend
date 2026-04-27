@@ -13,14 +13,21 @@ type Deps struct {
 	Registration *handler.RegistrationHandler
 	Panel        *handler.PanelHandler
 	Admin        *handler.AdminHandler
+	Health       *handler.HealthHandler
 	JWTSecret    string
 	CORSOrigin   string
 }
 
 func Setup(deps Deps) *gin.Engine {
-	r := gin.Default()
+	r := gin.New()
+	r.Use(gin.Recovery())
+	r.Use(middleware.RequestID())
 	r.Use(middleware.CORS(deps.CORSOrigin))
 	r.Use(middleware.Security())
+
+	// Health (no auth, no rate limit)
+	r.GET("/healthz", deps.Health.Healthz)
+	r.GET("/readyz", deps.Health.Readyz)
 
 	api := r.Group("/api")
 
@@ -33,8 +40,8 @@ func Setup(deps Deps) *gin.Engine {
 	api.POST("/quotes", deps.Quote.Create)
 	api.POST("/registrations", deps.Registration.Create)
 
-	// Auth
-	api.POST("/auth/login", deps.Auth.Login)
+	// Auth (rate-limited)
+	api.POST("/auth/login", middleware.RateLimit(), deps.Auth.Login)
 	api.GET("/auth/me", middleware.Auth(deps.JWTSecret, "provider"), deps.Auth.Me)
 	api.POST("/auth/change-password", middleware.Auth(deps.JWTSecret, "provider"), deps.Auth.ChangePassword)
 
@@ -52,12 +59,13 @@ func Setup(deps Deps) *gin.Engine {
 	panel.GET("/profile", deps.Panel.GetProfile)
 	panel.PUT("/profile", deps.Panel.UpdateProfile)
 
-	// Admin
+	// Admin auth (rate-limited)
 	adminAuth := api.Group("/admin/auth")
-	adminAuth.POST("/login", deps.Auth.AdminLogin)
+	adminAuth.POST("/login", middleware.RateLimit(), deps.Auth.AdminLogin)
 	adminAuth.GET("/me", middleware.Auth(deps.JWTSecret, "admin"), deps.Auth.AdminMe)
 	adminAuth.POST("/change-password", middleware.Auth(deps.JWTSecret, "admin"), deps.Auth.ChangePassword)
 
+	// Admin (protected)
 	admin := api.Group("/admin", middleware.Auth(deps.JWTSecret, "admin"))
 	admin.GET("/registrations", deps.Admin.ListRegistrations)
 	admin.GET("/registrations/:id", deps.Admin.GetRegistration)

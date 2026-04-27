@@ -1,7 +1,7 @@
 package handler
 
 import (
-	"log"
+	"log/slog"
 	"net/http"
 
 	"github.com/crisbusta/proindustrial-backend-public/internal/middleware"
@@ -25,14 +25,14 @@ func (h *PanelHandler) DashboardStats(c *gin.Context) {
 
 	stats, err := h.quoteRepo.Stats(companyID)
 	if err != nil {
-		log.Printf("DashboardStats quoteRepo error: %v", err)
+		slog.Error("DashboardStats quoteRepo error", "err", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "error interno del servidor"})
 		return
 	}
 
 	totalServices, err := h.serviceRepo.Count(companyID)
 	if err != nil {
-		log.Printf("DashboardStats serviceRepo error: %v", err)
+		slog.Error("DashboardStats serviceRepo error", "err", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "error interno del servidor"})
 		return
 	}
@@ -88,7 +88,7 @@ func (h *PanelHandler) UpdateProfile(c *gin.Context) {
 	}
 
 	if err := h.companyRepo.Update(companyID, fields); err != nil {
-		log.Printf("UpdateProfile error: %v", err)
+		slog.Error("UpdateProfile error", "err", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "error interno del servidor"})
 		return
 	}
@@ -102,7 +102,7 @@ func (h *PanelHandler) ListServices(c *gin.Context) {
 	companyID := c.GetString(middleware.CompanyIDKey)
 	services, err := h.serviceRepo.List(companyID)
 	if err != nil {
-		log.Printf("ListServices error: %v", err)
+		slog.Error("ListServices error", "err", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "error interno del servidor"})
 		return
 	}
@@ -128,7 +128,7 @@ func (h *PanelHandler) CreateService(c *gin.Context) {
 		Description: body.Description,
 	})
 	if err != nil {
-		log.Printf("CreateService error: %v", err)
+		slog.Error("CreateService error", "err", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "error interno del servidor"})
 		return
 	}
