@@ -10,11 +10,27 @@ import (
 	"github.com/crisbusta/proindustrial-backend-public/internal/notify"
 	"github.com/crisbusta/proindustrial-backend-public/internal/repository"
 	"github.com/crisbusta/proindustrial-backend-public/internal/router"
+	"github.com/crisbusta/proindustrial-backend-public/internal/storage"
 )
 
 func main() {
 	cfg := config.Load()
 	logger.Init(cfg.AppEnv)
+
+	store, err := storage.New(storage.Config{
+		Driver:      cfg.StorageDriver,
+		BaseURL:     cfg.AppBaseURL + "/uploads",
+		Dir:         cfg.StorageDir,
+		S3Bucket:    cfg.S3Bucket,
+		S3Region:    cfg.S3Region,
+		S3Endpoint:  cfg.S3Endpoint,
+		S3AccessKey: cfg.S3AccessKey,
+		S3SecretKey: cfg.S3SecretKey,
+		S3PublicBase: cfg.S3PublicBase,
+	})
+	if err != nil {
+		slog.Error("storage init failed", "err", err)
+	}
 
 	mailer := notify.NewMailer(cfg)
 
@@ -46,6 +62,8 @@ func main() {
 		Panel:        panelHandler,
 		Admin:        adminHandler,
 		Health:       healthHandler,
+		Storage:      store,
+		StorageDir:   cfg.StorageDir,
 		JWTSecret:    cfg.JWTSecret,
 		CORSOrigin:   cfg.CORSOrigin,
 	})

@@ -22,6 +22,16 @@ type Config struct {
 	SMTPPass        string
 	SMTPFrom        string
 	AppBaseURL      string
+
+	// Storage
+	StorageDriver   string // "local" (default) | "s3"
+	StorageDir      string // local only: path to uploads dir
+	S3Bucket        string
+	S3Region        string
+	S3Endpoint      string // R2: https://<account>.r2.cloudflarestorage.com
+	S3AccessKey     string
+	S3SecretKey     string
+	S3PublicBase    string // CDN base URL for S3/R2
 }
 
 func Load() Config {
@@ -50,6 +60,15 @@ func Load() Config {
 		SMTPPass:        getEnv("SMTP_PASS", ""),
 		SMTPFrom:        getEnv("SMTP_FROM", ""),
 		AppBaseURL:      getEnv("APP_BASE_URL", "http://localhost:3001"),
+
+		StorageDriver:   getEnv("STORAGE_DRIVER", "local"),
+		StorageDir:      getEnv("STORAGE_DIR", "./uploads"),
+		S3Bucket:        getEnv("S3_BUCKET", ""),
+		S3Region:        getEnv("S3_REGION", "auto"),
+		S3Endpoint:      getEnv("S3_ENDPOINT", ""),
+		S3AccessKey:     getEnv("S3_ACCESS_KEY", ""),
+		S3SecretKey:     getEnv("S3_SECRET_KEY", ""),
+		S3PublicBase:    getEnv("S3_PUBLIC_BASE", ""),
 	}
 }
 

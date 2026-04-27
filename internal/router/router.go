@@ -1,8 +1,11 @@
 package router
 
 import (
+	"net/http"
+
 	"github.com/crisbusta/proindustrial-backend-public/internal/handler"
 	"github.com/crisbusta/proindustrial-backend-public/internal/middleware"
+	"github.com/crisbusta/proindustrial-backend-public/internal/storage"
 	"github.com/gin-gonic/gin"
 )
 
@@ -14,6 +17,8 @@ type Deps struct {
 	Panel        *handler.PanelHandler
 	Admin        *handler.AdminHandler
 	Health       *handler.HealthHandler
+	Storage      storage.Provider
+	StorageDir   string
 	JWTSecret    string
 	CORSOrigin   string
 }
@@ -28,6 +33,13 @@ func Setup(deps Deps) *gin.Engine {
 	// Health (no auth, no rate limit)
 	r.GET("/healthz", deps.Health.Healthz)
 	r.GET("/readyz", deps.Health.Readyz)
+
+	// Static uploads — only used with the local storage driver.
+	// When STORAGE_DRIVER=s3, files are served directly from S3/R2/CDN
+	// and this route is never hit (PublicURL points elsewhere).
+	if deps.StorageDir != "" {
+		r.StaticFS("/uploads", http.Dir(deps.StorageDir))
+	}
 
 	api := r.Group("/api")
 
