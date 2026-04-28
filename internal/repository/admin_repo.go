@@ -1,7 +1,6 @@
 package repository
 
 import (
-	"errors"
 	"fmt"
 	"regexp"
 	"strings"
@@ -11,13 +10,7 @@ import (
 	"github.com/lib/pq"
 )
 
-var (
-	ErrRegistrationNotFound    = errors.New("registration not found")
-	ErrRegistrationAlreadyDone = errors.New("registration already processed")
-	ErrRegistrationEmailInUse  = errors.New("registration email already in use")
-	ErrApprovedCompanyNotFound = errors.New("approved company not found")
-	nonSlugCharPattern         = regexp.MustCompile(`[^a-z0-9]+`)
-)
+var nonSlugCharPattern = regexp.MustCompile(`[^a-z0-9]+`)
 
 type AdminRepo struct {
 	db *sqlx.DB

@@ -82,8 +82,51 @@ type Company struct {
 	Website     NullString     `db:"website"     json:"website"`
 	YearsActive NullInt64      `db:"years_active" json:"yearsActive"`
 	Featured    bool           `db:"featured"    json:"featured"`
+	LogoURL     NullString     `db:"logo_url"    json:"logoUrl"`
+	CoverURL    NullString     `db:"cover_url"   json:"coverUrl"`
 	CreatedAt   time.Time      `db:"created_at"  json:"createdAt"`
 	UpdatedAt   time.Time      `db:"updated_at"  json:"updatedAt"`
+}
+
+type ServiceImage struct {
+	ID        string     `db:"id"         json:"id"`
+	ServiceID string     `db:"service_id" json:"serviceId"`
+	URL       string     `db:"url"        json:"url"`
+	AltText   NullString `db:"alt_text"   json:"altText"`
+	SortOrder int        `db:"sort_order" json:"sortOrder"`
+	CreatedAt time.Time  `db:"created_at" json:"createdAt"`
+}
+
+type CompanyCertification struct {
+	ID          string     `db:"id"           json:"id"`
+	CompanyID   string     `db:"company_id"   json:"companyId"`
+	Name        string     `db:"name"         json:"name"`
+	Issuer      NullString `db:"issuer"       json:"issuer"`
+	DocumentURL NullString `db:"document_url" json:"documentUrl"`
+	IssuedAt    NullString `db:"issued_at"    json:"issuedAt"`
+	ExpiresAt   NullString `db:"expires_at"   json:"expiresAt"`
+	CreatedAt   time.Time  `db:"created_at"   json:"createdAt"`
+}
+
+type CompanyProject struct {
+	ID          string         `db:"id"          json:"id"`
+	CompanyID   string         `db:"company_id"  json:"companyId"`
+	Title       string         `db:"title"       json:"title"`
+	Description NullString     `db:"description" json:"description"`
+	ClientName  NullString     `db:"client_name" json:"clientName"`
+	Year        NullInt64      `db:"year"        json:"year"`
+	CoverURL    NullString     `db:"cover_url"   json:"coverUrl"`
+	SortOrder   int            `db:"sort_order"  json:"sortOrder"`
+	CreatedAt   time.Time      `db:"created_at"  json:"createdAt"`
+	Images      []ProjectImage `db:"-"           json:"images"`
+}
+
+type ProjectImage struct {
+	ID        string     `db:"id"         json:"id"`
+	ProjectID string     `db:"project_id" json:"projectId"`
+	URL       string     `db:"url"        json:"url"`
+	AltText   NullString `db:"alt_text"   json:"altText"`
+	SortOrder int        `db:"sort_order" json:"sortOrder"`
 }
 
 type User struct {

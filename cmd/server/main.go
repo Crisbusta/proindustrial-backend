@@ -44,6 +44,7 @@ func main() {
 	serviceRepo := repository.NewServiceRepo(db)
 	registrationRepo := repository.NewRegistrationRepo(db)
 	adminRepo := repository.NewAdminRepo(db)
+	mediaRepo := repository.NewMediaRepo(db)
 
 	// Handlers
 	companyHandler := handler.NewCompanyHandler(companyRepo, serviceRepo)
@@ -53,6 +54,7 @@ func main() {
 	panelHandler := handler.NewPanelHandler(serviceRepo, quoteRepo, companyRepo)
 	adminHandler := handler.NewAdminHandler(adminRepo, mailer, cfg.InitialPassword)
 	healthHandler := handler.NewHealthHandler(db)
+	mediaHandler := handler.NewMediaHandler(mediaRepo, companyRepo, store)
 
 	r := router.Setup(router.Deps{
 		Company:      companyHandler,
@@ -62,6 +64,7 @@ func main() {
 		Panel:        panelHandler,
 		Admin:        adminHandler,
 		Health:       healthHandler,
+		Media:        mediaHandler,
 		Storage:      store,
 		StorageDir:   cfg.StorageDir,
 		JWTSecret:    cfg.JWTSecret,

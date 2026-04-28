@@ -17,6 +17,7 @@ type Deps struct {
 	Panel        *handler.PanelHandler
 	Admin        *handler.AdminHandler
 	Health       *handler.HealthHandler
+	Media        *handler.MediaHandler
 	Storage      storage.Provider
 	StorageDir   string
 	JWTSecret    string
@@ -49,6 +50,8 @@ func Setup(deps Deps) *gin.Engine {
 	api.GET("/companies", deps.Company.List)
 	api.GET("/companies/:slug", deps.Company.GetBySlug)
 	api.GET("/companies/:slug/services", deps.Company.ListServices)
+	api.GET("/companies/:slug/certifications", deps.Media.GetPublicCertifications)
+	api.GET("/companies/:slug/projects", deps.Media.GetPublicProjects)
 	api.POST("/quotes", deps.Quote.Create)
 	api.POST("/registrations", deps.Registration.Create)
 
@@ -70,6 +73,33 @@ func Setup(deps Deps) *gin.Engine {
 	panel.DELETE("/services/:id", deps.Panel.DeleteService)
 	panel.GET("/profile", deps.Panel.GetProfile)
 	panel.PUT("/profile", deps.Panel.UpdateProfile)
+
+	// Media — profile images
+	panel.POST("/profile/logo", deps.Media.UploadLogo)
+	panel.POST("/profile/cover", deps.Media.UploadCover)
+	panel.GET("/profile/regions", deps.Media.GetServiceRegions)
+	panel.PUT("/profile/regions", deps.Media.UpdateServiceRegions)
+
+	// Media — service images
+	panel.GET("/services/:id/images", deps.Media.ListServiceImages)
+	panel.POST("/services/:id/images", deps.Media.AddServiceImage)
+	panel.DELETE("/services/:id/images/:imgId", deps.Media.DeleteServiceImage)
+	panel.PATCH("/services/:id/images/reorder", deps.Media.ReorderServiceImages)
+
+	// Media — certifications
+	panel.GET("/certifications", deps.Media.ListCertifications)
+	panel.POST("/certifications", deps.Media.CreateCertification)
+	panel.PATCH("/certifications/:id", deps.Media.UpdateCertification)
+	panel.DELETE("/certifications/:id", deps.Media.DeleteCertification)
+	panel.POST("/certifications/:id/document", deps.Media.UploadCertificationDoc)
+
+	// Media — projects
+	panel.GET("/projects", deps.Media.ListProjects)
+	panel.POST("/projects", deps.Media.CreateProject)
+	panel.PATCH("/projects/:id", deps.Media.UpdateProject)
+	panel.DELETE("/projects/:id", deps.Media.DeleteProject)
+	panel.POST("/projects/:id/images", deps.Media.AddProjectImage)
+	panel.DELETE("/projects/:id/images/:imgId", deps.Media.DeleteProjectImage)
 
 	// Admin auth (rate-limited)
 	adminAuth := api.Group("/admin/auth")
