@@ -2,9 +2,11 @@ package repository
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/crisbusta/proindustrial-backend-public/internal/model"
 	"github.com/jmoiron/sqlx"
+	"github.com/lib/pq"
 )
 
 type QuoteRepo struct {
@@ -87,10 +89,36 @@ func (r *QuoteRepo) SetReply(id, companyID, note string) (*model.QuoteRequest, e
 	var q model.QuoteRequest
 	err := r.db.QueryRowx(`
 		UPDATE quote_requests
-		SET reply_note = $1, replied_at = NOW(), status = 'responded'
+		SET reply_note = $1, replied_at = NOW(), status = 'responded',
+		    first_response_at = COALESCE(first_response_at, NOW())
 		WHERE id = $2 AND target_company_id = $3
 		RETURNING *`,
 		note, id, companyID,
+	).StructScan(&q)
+	return &q, err
+}
+
+func (r *QuoteRepo) SetTags(id, companyID string, tags []string) (*model.QuoteRequest, error) {
+	if tags == nil {
+		tags = []string{}
+	}
+	var q model.QuoteRequest
+	err := r.db.QueryRowx(`
+		UPDATE quote_requests SET tags = $1
+		WHERE id = $2 AND target_company_id = $3
+		RETURNING *`,
+		pq.Array(tags), id, companyID,
+	).StructScan(&q)
+	return &q, err
+}
+
+func (r *QuoteRepo) SetFollowUp(id, companyID string, followUpAt *time.Time) (*model.QuoteRequest, error) {
+	var q model.QuoteRequest
+	err := r.db.QueryRowx(`
+		UPDATE quote_requests SET follow_up_at = $1
+		WHERE id = $2 AND target_company_id = $3
+		RETURNING *`,
+		followUpAt, id, companyID,
 	).StructScan(&q)
 	return &q, err
 }

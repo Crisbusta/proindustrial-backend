@@ -19,6 +19,7 @@ func NewCompanyHandler(repo *repository.CompanyRepo, serviceRepo *repository.Ser
 func (h *CompanyHandler) List(c *gin.Context) {
 	category := c.Query("category")
 	region := c.Query("region")
+	q := c.Query("q")
 
 	var featured *bool
 	if f := c.Query("featured"); f == "true" {
@@ -29,7 +30,7 @@ func (h *CompanyHandler) List(c *gin.Context) {
 		featured = &f2
 	}
 
-	companies, err := h.repo.List(category, region, featured)
+	companies, err := h.repo.List(category, region, q, featured)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

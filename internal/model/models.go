@@ -140,22 +140,57 @@ type User struct {
 }
 
 type QuoteRequest struct {
-	ID               string     `db:"id"                json:"id"`
-	RequesterName    string     `db:"requester_name"    json:"requesterName"`
-	RequesterCompany NullString `db:"requester_company" json:"requesterCompany"`
-	RequesterEmail   string     `db:"requester_email"   json:"requesterEmail"`
-	RequesterPhone   NullString `db:"requester_phone"   json:"requesterPhone"`
-	Service          string     `db:"service"           json:"service"`
-	Description      NullString `db:"description"       json:"description"`
-	Location         NullString `db:"location"          json:"location"`
-	TargetCompanyID  NullString `db:"target_company_id" json:"targetCompanyId"`
-	Status           string     `db:"status"            json:"status"`
-	ReplyNote        NullString `db:"reply_note"        json:"replyNote"`
-	RepliedAt        *time.Time `db:"replied_at"        json:"repliedAt"`
-	Outcome          NullString `db:"outcome"           json:"outcome"`
-	OutcomeNote      NullString `db:"outcome_note"      json:"outcomeNote"`
-	ClosedAt         *time.Time `db:"closed_at"         json:"closedAt"`
-	CreatedAt        time.Time  `db:"created_at"        json:"createdAt"`
+	ID                string         `db:"id"                  json:"id"`
+	RequesterName     string         `db:"requester_name"      json:"requesterName"`
+	RequesterCompany  NullString     `db:"requester_company"   json:"requesterCompany"`
+	RequesterEmail    string         `db:"requester_email"     json:"requesterEmail"`
+	RequesterPhone    NullString     `db:"requester_phone"     json:"requesterPhone"`
+	Service           string         `db:"service"             json:"service"`
+	Description       NullString     `db:"description"         json:"description"`
+	Location          NullString     `db:"location"            json:"location"`
+	TargetCompanyID   NullString     `db:"target_company_id"   json:"targetCompanyId"`
+	Status            string         `db:"status"              json:"status"`
+	ReplyNote         NullString     `db:"reply_note"          json:"replyNote"`
+	RepliedAt         *time.Time     `db:"replied_at"          json:"repliedAt"`
+	Outcome           NullString     `db:"outcome"             json:"outcome"`
+	OutcomeNote       NullString     `db:"outcome_note"        json:"outcomeNote"`
+	ClosedAt          *time.Time     `db:"closed_at"           json:"closedAt"`
+	FirstResponseAt   *time.Time     `db:"first_response_at"   json:"firstResponseAt"`
+	Tags              pq.StringArray `db:"tags"                json:"tags"`
+	FollowUpAt        *time.Time     `db:"follow_up_at"        json:"followUpAt"`
+	OutcomeAmountCLP  NullInt64      `db:"outcome_amount_clp"  json:"outcomeAmountClp"`
+	CreatedAt         time.Time      `db:"created_at"          json:"createdAt"`
+}
+
+// Analytics models
+type CompanyEvent struct {
+	ID        string    `db:"id"         json:"id"`
+	CompanyID string    `db:"company_id" json:"-"`
+	EventType string    `db:"event_type" json:"eventType"`
+	CreatedAt time.Time `db:"created_at" json:"createdAt"`
+}
+
+type DailyMetric struct {
+	Date          string `json:"date"`
+	ProfileViews  int    `json:"profileViews"`
+	ContactClicks int    `json:"contactClicks"`
+	RFQs          int    `json:"rfqs"`
+}
+
+type AnalyticsTotals struct {
+	ProfileViews     int     `json:"profileViews"`
+	ContactClicks    int     `json:"contactClicks"`
+	QuoteFormOpens   int     `json:"quoteFormOpens"`
+	QuoteFormSubmits int     `json:"quoteFormSubmits"`
+	RFQsReceived     int     `json:"rfqsReceived"`
+	ContactRate      float64 `json:"contactRate"`
+}
+
+type AnalyticsResult struct {
+	Range  string          `json:"range"`
+	Days   int             `json:"days"`
+	Totals AnalyticsTotals `json:"totals"`
+	Trend  []DailyMetric   `json:"trend"`
 }
 
 type CompanyService struct {

@@ -16,10 +16,11 @@ func NewCompanyRepo(db *sqlx.DB) *CompanyRepo {
 	return &CompanyRepo{db: db}
 }
 
-func (r *CompanyRepo) List(category, region string, featured *bool) ([]model.Company, error) {
+func (r *CompanyRepo) List(category, region, q string, featured *bool) ([]model.Company, error) {
 	query := `SELECT * FROM companies WHERE 1=1`
 	args := []interface{}{}
 	idx := 1
+	qIdx := 0
 
 	if category != "" {
 		query += fmt.Sprintf(" AND $%d = ANY(categories)", idx)
@@ -36,8 +37,20 @@ func (r *CompanyRepo) List(category, region string, featured *bool) ([]model.Com
 		args = append(args, *featured)
 		idx++
 	}
-	_ = strings.TrimSpace(query) // suppress unused import warning
-	query += " ORDER BY featured DESC, name ASC"
+	if q != "" {
+		qIdx = idx
+		query += fmt.Sprintf(" AND tsv @@ plainto_tsquery('spanish', $%d)", idx)
+		args = append(args, q)
+		idx++
+	}
+	_ = strings.TrimSpace(query)
+	_ = idx
+
+	if qIdx > 0 {
+		query += fmt.Sprintf(" ORDER BY ts_rank(tsv, plainto_tsquery('spanish', $%d)) DESC, featured DESC, name ASC", qIdx)
+	} else {
+		query += " ORDER BY featured DESC, name ASC"
+	}
 
 	companies := []model.Company{}
 	err := r.db.Select(&companies, query, args...)

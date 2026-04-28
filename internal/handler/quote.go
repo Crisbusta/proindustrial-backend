@@ -3,6 +3,7 @@ package handler
 import (
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/crisbusta/proindustrial-backend-public/internal/middleware"
 	"github.com/crisbusta/proindustrial-backend-public/internal/notify"
@@ -119,6 +120,42 @@ func (h *QuoteHandler) Reply(c *gin.Context) {
 		slog.Info("quote reply email sent", "to", q.RequesterEmail, "status", delivery.Status)
 	}
 
+	c.JSON(http.StatusOK, gin.H{"data": q})
+}
+
+func (h *QuoteHandler) SetTags(c *gin.Context) {
+	companyID := c.GetString(middleware.CompanyIDKey)
+	id := c.Param("id")
+	var body struct {
+		Tags []string `json:"tags" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "tags requerido"})
+		return
+	}
+	q, err := h.repo.SetTags(id, companyID, body.Tags)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "solicitud no encontrada"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": q})
+}
+
+func (h *QuoteHandler) SetFollowUp(c *gin.Context) {
+	companyID := c.GetString(middleware.CompanyIDKey)
+	id := c.Param("id")
+	var body struct {
+		FollowUpAt *time.Time `json:"followUpAt"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "body inválido"})
+		return
+	}
+	q, err := h.repo.SetFollowUp(id, companyID, body.FollowUpAt)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "solicitud no encontrada"})
+		return
+	}
 	c.JSON(http.StatusOK, gin.H{"data": q})
 }
 

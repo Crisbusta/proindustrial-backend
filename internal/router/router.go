@@ -18,6 +18,7 @@ type Deps struct {
 	Admin        *handler.AdminHandler
 	Health       *handler.HealthHandler
 	Media        *handler.MediaHandler
+	Analytics    *handler.AnalyticsHandler
 	Storage      storage.Provider
 	StorageDir   string
 	JWTSecret    string
@@ -45,6 +46,7 @@ func Setup(deps Deps) *gin.Engine {
 	api := r.Group("/api")
 
 	// Public
+	api.POST("/events", deps.Analytics.TrackEvent)
 	api.GET("/category-groups", handler.GetCategoryGroups)
 	api.GET("/regions", handler.GetRegions)
 	api.GET("/companies", deps.Company.List)
@@ -67,6 +69,9 @@ func Setup(deps Deps) *gin.Engine {
 	panel.PATCH("/quotes/:id", deps.Quote.UpdateStatus)
 	panel.POST("/quotes/:id/reply", deps.Quote.Reply)
 	panel.POST("/quotes/:id/close", deps.Quote.Close)
+	panel.PATCH("/quotes/:id/tags", deps.Quote.SetTags)
+	panel.PATCH("/quotes/:id/follow-up", deps.Quote.SetFollowUp)
+	panel.GET("/analytics", deps.Analytics.GetAnalytics)
 	panel.GET("/services", deps.Panel.ListServices)
 	panel.POST("/services", deps.Panel.CreateService)
 	panel.PATCH("/services/:id", deps.Panel.UpdateService)
