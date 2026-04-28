@@ -16,8 +16,10 @@ func NewCompanyRepo(db *sqlx.DB) *CompanyRepo {
 	return &CompanyRepo{db: db}
 }
 
+const companyCols = `id, slug, name, tagline, description, location, region, categories, services, phone, email, website, years_active, featured, logo_url, cover_url, created_at, updated_at`
+
 func (r *CompanyRepo) List(category, region, q string, featured *bool) ([]model.Company, error) {
-	query := `SELECT * FROM companies WHERE 1=1`
+	query := `SELECT ` + companyCols + ` FROM companies WHERE 1=1`
 	args := []interface{}{}
 	idx := 1
 	qIdx := 0
@@ -59,7 +61,7 @@ func (r *CompanyRepo) List(category, region, q string, featured *bool) ([]model.
 
 func (r *CompanyRepo) GetBySlug(slug string) (*model.Company, error) {
 	var company model.Company
-	err := r.db.Get(&company, "SELECT * FROM companies WHERE slug = $1", slug)
+	err := r.db.Get(&company, "SELECT "+companyCols+" FROM companies WHERE slug = $1", slug)
 	if err != nil {
 		return nil, err
 	}
@@ -68,7 +70,7 @@ func (r *CompanyRepo) GetBySlug(slug string) (*model.Company, error) {
 
 func (r *CompanyRepo) GetByID(id string) (*model.Company, error) {
 	var company model.Company
-	err := r.db.Get(&company, "SELECT * FROM companies WHERE id = $1", id)
+	err := r.db.Get(&company, "SELECT "+companyCols+" FROM companies WHERE id = $1", id)
 	if err != nil {
 		return nil, err
 	}
