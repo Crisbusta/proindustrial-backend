@@ -55,7 +55,7 @@ func (h *CompanyHandler) ListServices(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "company not found"})
 		return
 	}
-	services, err := h.serviceRepo.ListActive(company.ID)
+	services, err := h.serviceRepo.ListActiveWithImages(company.ID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "error interno del servidor"})
 		return

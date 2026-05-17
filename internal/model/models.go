@@ -194,13 +194,14 @@ type AnalyticsResult struct {
 }
 
 type CompanyService struct {
-	ID          string     `db:"id"          json:"id"`
-	CompanyID   string     `db:"company_id"  json:"companyId"`
-	Name        string     `db:"name"        json:"name"`
-	Category    NullString `db:"category"    json:"category"`
-	Description NullString `db:"description" json:"description"`
-	Status      string     `db:"status"      json:"status"`
-	CreatedAt   time.Time  `db:"created_at"  json:"createdAt"`
+	ID          string         `db:"id"          json:"id"`
+	CompanyID   string         `db:"company_id"  json:"companyId"`
+	Name        string         `db:"name"        json:"name"`
+	Category    NullString     `db:"category"    json:"category"`
+	Description NullString     `db:"description" json:"description"`
+	Status      string         `db:"status"      json:"status"`
+	CreatedAt   time.Time      `db:"created_at"  json:"createdAt"`
+	Images      []ServiceImage `db:"-"           json:"images"`
 }
 
 type ProviderRegistration struct {

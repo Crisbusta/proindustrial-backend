@@ -47,6 +47,41 @@ func (r *ServiceRepo) ListActive(companyID string) ([]model.CompanyService, erro
 	return services, err
 }
 
+func (r *ServiceRepo) ListActiveWithImages(companyID string) ([]model.CompanyService, error) {
+	services, err := r.ListActive(companyID)
+	if err != nil || len(services) == 0 {
+		return services, err
+	}
+
+	ids := make([]string, len(services))
+	for i, s := range services {
+		ids[i] = s.ID
+	}
+
+	images := []model.ServiceImage{}
+	query, args, err := sqlx.In(
+		`SELECT * FROM service_images WHERE service_id IN (?) ORDER BY sort_order ASC`,
+		ids,
+	)
+	if err == nil {
+		query = r.db.Rebind(query)
+		_ = r.db.Select(&images, query, args...)
+	}
+
+	imgMap := make(map[string][]model.ServiceImage)
+	for _, img := range images {
+		imgMap[img.ServiceID] = append(imgMap[img.ServiceID], img)
+	}
+	for i := range services {
+		if imgs := imgMap[services[i].ID]; imgs != nil {
+			services[i].Images = imgs
+		} else {
+			services[i].Images = []model.ServiceImage{}
+		}
+	}
+	return services, nil
+}
+
 func (r *ServiceRepo) Create(companyID string, in CreateServiceInput) (*model.CompanyService, error) {
 	var s model.CompanyService
 	err := r.db.QueryRowx(`
