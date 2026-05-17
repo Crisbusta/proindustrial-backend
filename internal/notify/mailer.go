@@ -162,6 +162,66 @@ func (m *Mailer) sendViaResend(to, subject, textBody string) DeliveryResult {
 	}
 }
 
+func (m *Mailer) SendNewQuoteNotification(to, companyName, requesterName, requesterCompany, service, description string) DeliveryResult {
+	subject := fmt.Sprintf("Nueva solicitud de cotización — %s", service)
+	requesterLine := requesterName
+	if requesterCompany != "" {
+		requesterLine = fmt.Sprintf("%s (%s)", requesterName, requesterCompany)
+	}
+	descLine := ""
+	if description != "" {
+		descLine = fmt.Sprintf("\nDetalle:\n%s\n", description)
+	}
+	body := strings.TrimSpace(fmt.Sprintf(`
+Hola %s,
+
+%s ha solicitado una cotización para "%s".
+%s
+Ingresa a tu panel para ver el detalle y responder:
+%s/panel/solicitudes
+
+— PuntoFusión
+`, companyName, requesterLine, service, descLine, strings.TrimRight(m.cfg.AppBaseURL, "/")))
+
+	return m.send(to, subject, body)
+}
+
+func (m *Mailer) SendQuoteSubmitConfirmation(to, requesterName, companyName, service string) DeliveryResult {
+	subject := fmt.Sprintf("Tu solicitud fue enviada a %s", companyName)
+	body := strings.TrimSpace(fmt.Sprintf(`
+Hola %s,
+
+Tu solicitud de cotización para "%s" fue enviada exitosamente a %s.
+
+Te contactarán a la brevedad a este correo.
+
+— PuntoFusión
+`, requesterName, service, companyName))
+
+	return m.send(to, subject, body)
+}
+
+func (m *Mailer) send(to, subject, body string) DeliveryResult {
+	if m.cfg.ResendAPIKey != "" && m.cfg.ResendFrom != "" {
+		return m.sendViaResend(to, subject, body)
+	}
+	if m.cfg.SMTPHost == "" || m.cfg.SMTPFrom == "" {
+		log.Printf("email not sent (no provider). to=%s subject=%q", to, subject)
+		return DeliveryResult{Status: "logged", Note: "No hay proveedor de correo configurado."}
+	}
+	msg := []byte(fmt.Sprintf("From: %s\r\nTo: %s\r\nSubject: %s\r\n\r\n%s\r\n", m.cfg.SMTPFrom, to, subject, body))
+	addr := fmt.Sprintf("%s:%s", m.cfg.SMTPHost, m.cfg.SMTPPort)
+	var auth smtp.Auth
+	if m.cfg.SMTPUser != "" {
+		auth = smtp.PlainAuth("", m.cfg.SMTPUser, m.cfg.SMTPPass, m.cfg.SMTPHost)
+	}
+	if err := smtp.SendMail(addr, auth, m.cfg.SMTPFrom, []string{to}, msg); err != nil {
+		log.Printf("email send failed: to=%s err=%v", to, err)
+		return DeliveryResult{Status: "failed", Note: fmt.Sprintf("No se pudo enviar: %v", err)}
+	}
+	return DeliveryResult{Status: "sent", Note: fmt.Sprintf("Correo enviado a %s.", to)}
+}
+
 func textToHTML(text string) string {
 	escaped := strings.ReplaceAll(text, "&", "&amp;")
 	escaped = strings.ReplaceAll(escaped, "<", "&lt;")

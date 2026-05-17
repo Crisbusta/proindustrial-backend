@@ -52,6 +52,29 @@ func (h *QuoteHandler) Create(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "error interno del servidor"})
 		return
 	}
+
+	if h.mailer != nil {
+		companyName := ""
+		companyEmail := ""
+		if body.TargetCompanyID != "" {
+			if company, err := h.companyRepo.GetByID(body.TargetCompanyID); err == nil {
+				companyName = company.Name
+				if company.Email.Valid {
+					companyEmail = company.Email.String
+				}
+			}
+		}
+		if companyEmail != "" {
+			d := h.mailer.SendNewQuoteNotification(companyEmail, companyName, body.RequesterName, body.RequesterCompany, body.Service, body.Description)
+			slog.Info("new quote notification sent", "to", companyEmail, "status", d.Status)
+		}
+		if companyName == "" {
+			companyName = "la empresa"
+		}
+		d := h.mailer.SendQuoteSubmitConfirmation(body.RequesterEmail, body.RequesterName, companyName, body.Service)
+		slog.Info("quote confirmation sent", "to", body.RequesterEmail, "status", d.Status)
+	}
+
 	c.JSON(http.StatusCreated, gin.H{"data": q})
 }
 
