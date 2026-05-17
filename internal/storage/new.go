@@ -32,10 +32,7 @@ func New(cfg Config) (Provider, error) {
 		return NewLocalProvider(dir, cfg.BaseURL)
 
 	case "s3":
-		return nil, fmt.Errorf(
-			"storage: s3 driver is not yet active — " +
-				"uncomment S3Provider in internal/storage/s3.go and add the aws-sdk-go-v2 dependency",
-		)
+		return NewS3Provider(cfg.S3Bucket, cfg.S3Region, cfg.S3Endpoint, cfg.S3AccessKey, cfg.S3SecretKey, cfg.S3PublicBase)
 
 	default:
 		return nil, fmt.Errorf("storage: unknown driver %q (supported: local, s3)", cfg.Driver)
