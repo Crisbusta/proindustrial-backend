@@ -88,7 +88,7 @@ func (r *AdminRepo) ApproveRegistration(id, passwordHash, initialPassword string
 			slug, name, description, location, region, categories, services, phone, email, featured
 		)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, false)
-		RETURNING *`,
+		RETURNING `+companyCols,
 		slug,
 		reg.CompanyName,
 		reg.Description,
