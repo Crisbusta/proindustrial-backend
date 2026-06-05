@@ -2,6 +2,7 @@ package notify
 
 import (
 	"bytes"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -42,38 +43,7 @@ Contraseña inicial: %s
 Por seguridad, al ingresar deberás cambiar tu contraseña inmediatamente.
 `, companyName, strings.TrimRight(m.cfg.AppBaseURL, "/"), to, initialPassword))
 
-	if m.cfg.ResendAPIKey != "" && m.cfg.ResendFrom != "" {
-		return m.sendViaResend(to, subject, body)
-	}
-
-	if m.cfg.SMTPHost == "" || m.cfg.SMTPFrom == "" {
-		log.Printf("approval email not sent; logging instead. to=%s subject=%q body=%q", to, subject, body)
-		return DeliveryResult{
-			Status: "logged",
-			Note:   "No hay proveedor de correo configurado; el mensaje fue escrito en logs.",
-		}
-	}
-
-	msg := []byte(fmt.Sprintf("From: %s\r\nTo: %s\r\nSubject: %s\r\n\r\n%s\r\n", m.cfg.SMTPFrom, to, subject, body))
-	addr := fmt.Sprintf("%s:%s", m.cfg.SMTPHost, m.cfg.SMTPPort)
-
-	var auth smtp.Auth
-	if m.cfg.SMTPUser != "" {
-		auth = smtp.PlainAuth("", m.cfg.SMTPUser, m.cfg.SMTPPass, m.cfg.SMTPHost)
-	}
-
-	if err := smtp.SendMail(addr, auth, m.cfg.SMTPFrom, []string{to}, msg); err != nil {
-		log.Printf("approval email send failed: to=%s err=%v", to, err)
-		return DeliveryResult{
-			Status: "failed",
-			Note:   fmt.Sprintf("No se pudo enviar el correo: %v", err),
-		}
-	}
-
-	return DeliveryResult{
-		Status: "sent",
-		Note:   fmt.Sprintf("Correo enviado a %s.", to),
-	}
+	return m.send(to, subject, body)
 }
 
 func (m *Mailer) SendQuoteReply(to, requesterName, companyName, service, replyText string) DeliveryResult {
@@ -90,24 +60,7 @@ Si tienes dudas adicionales puedes responder directamente a este correo.
 — El equipo de PuntoFusión
 `, requesterName, companyName, service, replyText))
 
-	if m.cfg.ResendAPIKey != "" && m.cfg.ResendFrom != "" {
-		return m.sendViaResend(to, subject, body)
-	}
-	if m.cfg.SMTPHost == "" || m.cfg.SMTPFrom == "" {
-		log.Printf("quote reply not sent; logging instead. to=%s body=%q", to, body)
-		return DeliveryResult{Status: "logged", Note: "No hay proveedor de correo configurado."}
-	}
-	msg := []byte(fmt.Sprintf("From: %s\r\nTo: %s\r\nSubject: %s\r\n\r\n%s\r\n", m.cfg.SMTPFrom, to, subject, body))
-	addr := fmt.Sprintf("%s:%s", m.cfg.SMTPHost, m.cfg.SMTPPort)
-	var auth smtp.Auth
-	if m.cfg.SMTPUser != "" {
-		auth = smtp.PlainAuth("", m.cfg.SMTPUser, m.cfg.SMTPPass, m.cfg.SMTPHost)
-	}
-	if err := smtp.SendMail(addr, auth, m.cfg.SMTPFrom, []string{to}, msg); err != nil {
-		log.Printf("quote reply send failed: to=%s err=%v", to, err)
-		return DeliveryResult{Status: "failed", Note: fmt.Sprintf("No se pudo enviar: %v", err)}
-	}
-	return DeliveryResult{Status: "sent", Note: fmt.Sprintf("Correo enviado a %s.", to)}
+	return m.send(to, subject, body)
 }
 
 func (m *Mailer) sendViaResend(to, subject, textBody string) DeliveryResult {
@@ -209,17 +162,57 @@ func (m *Mailer) send(to, subject, body string) DeliveryResult {
 		log.Printf("email not sent (no provider). to=%s subject=%q", to, subject)
 		return DeliveryResult{Status: "logged", Note: "No hay proveedor de correo configurado."}
 	}
-	msg := []byte(fmt.Sprintf("From: %s\r\nTo: %s\r\nSubject: %s\r\n\r\n%s\r\n", m.cfg.SMTPFrom, to, subject, body))
-	addr := fmt.Sprintf("%s:%s", m.cfg.SMTPHost, m.cfg.SMTPPort)
-	var auth smtp.Auth
-	if m.cfg.SMTPUser != "" {
-		auth = smtp.PlainAuth("", m.cfg.SMTPUser, m.cfg.SMTPPass, m.cfg.SMTPHost)
-	}
-	if err := smtp.SendMail(addr, auth, m.cfg.SMTPFrom, []string{to}, msg); err != nil {
+	if err := m.smtpSend(to, subject, body); err != nil {
 		log.Printf("email send failed: to=%s err=%v", to, err)
 		return DeliveryResult{Status: "failed", Note: fmt.Sprintf("No se pudo enviar: %v", err)}
 	}
 	return DeliveryResult{Status: "sent", Note: fmt.Sprintf("Correo enviado a %s.", to)}
+}
+
+func (m *Mailer) smtpSend(to, subject, body string) error {
+	addr := fmt.Sprintf("%s:%s", m.cfg.SMTPHost, m.cfg.SMTPPort)
+	raw := []byte(fmt.Sprintf("From: %s\r\nTo: %s\r\nSubject: %s\r\n\r\n%s\r\n",
+		m.cfg.SMTPFrom, to, subject, body))
+
+	if m.cfg.SMTPPort == "465" {
+		conn, err := tls.Dial("tcp", addr, &tls.Config{ServerName: m.cfg.SMTPHost})
+		if err != nil {
+			return err
+		}
+		c, err := smtp.NewClient(conn, m.cfg.SMTPHost)
+		if err != nil {
+			return err
+		}
+		defer c.Close()
+		if m.cfg.SMTPUser != "" {
+			if err := c.Auth(smtp.PlainAuth("", m.cfg.SMTPUser, m.cfg.SMTPPass, m.cfg.SMTPHost)); err != nil {
+				return err
+			}
+		}
+		if err := c.Mail(m.cfg.SMTPFrom); err != nil {
+			return err
+		}
+		if err := c.Rcpt(to); err != nil {
+			return err
+		}
+		wc, err := c.Data()
+		if err != nil {
+			return err
+		}
+		if _, err = wc.Write(raw); err != nil {
+			return err
+		}
+		if err = wc.Close(); err != nil {
+			return err
+		}
+		return c.Quit()
+	}
+
+	var auth smtp.Auth
+	if m.cfg.SMTPUser != "" {
+		auth = smtp.PlainAuth("", m.cfg.SMTPUser, m.cfg.SMTPPass, m.cfg.SMTPHost)
+	}
+	return smtp.SendMail(addr, auth, m.cfg.SMTPFrom, []string{to}, raw)
 }
 
 func textToHTML(text string) string {
