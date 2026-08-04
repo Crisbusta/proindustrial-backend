@@ -1,0 +1,3 @@
+-- Irreversible: esta migración elimina datos seed de demo.
+-- No se re-insertan en el rollback. Si necesitas los datos de demo
+-- de vuelta, usa scripts/reset_seed.sql en un entorno de desarrollo.
