@@ -38,6 +38,31 @@ func (ns *NullString) Scan(value interface{}) error {
 	return ns.NullString.Scan(value)
 }
 
+// NullTime wraps sql.NullTime with proper JSON marshaling
+type NullTime struct {
+	sql.NullTime
+}
+
+func (nt NullTime) MarshalJSON() ([]byte, error) {
+	if !nt.Valid {
+		return []byte("null"), nil
+	}
+	return json.Marshal(nt.Time)
+}
+
+func (nt *NullTime) UnmarshalJSON(b []byte) error {
+	if string(b) == "null" {
+		nt.Valid = false
+		return nil
+	}
+	nt.Valid = true
+	return json.Unmarshal(b, &nt.Time)
+}
+
+func (nt NullTime) Value() (driver.Value, error) {
+	return nt.NullTime.Value()
+}
+
 // NullInt64 wraps sql.NullInt64 with proper JSON marshaling
 type NullInt64 struct {
 	sql.NullInt64
@@ -140,26 +165,26 @@ type User struct {
 }
 
 type QuoteRequest struct {
-	ID                string         `db:"id"                  json:"id"`
-	RequesterName     string         `db:"requester_name"      json:"requesterName"`
-	RequesterCompany  NullString     `db:"requester_company"   json:"requesterCompany"`
-	RequesterEmail    string         `db:"requester_email"     json:"requesterEmail"`
-	RequesterPhone    NullString     `db:"requester_phone"     json:"requesterPhone"`
-	Service           string         `db:"service"             json:"service"`
-	Description       NullString     `db:"description"         json:"description"`
-	Location          NullString     `db:"location"            json:"location"`
-	TargetCompanyID   NullString     `db:"target_company_id"   json:"targetCompanyId"`
-	Status            string         `db:"status"              json:"status"`
-	ReplyNote         NullString     `db:"reply_note"          json:"replyNote"`
-	RepliedAt         *time.Time     `db:"replied_at"          json:"repliedAt"`
-	Outcome           NullString     `db:"outcome"             json:"outcome"`
-	OutcomeNote       NullString     `db:"outcome_note"        json:"outcomeNote"`
-	ClosedAt          *time.Time     `db:"closed_at"           json:"closedAt"`
-	FirstResponseAt   *time.Time     `db:"first_response_at"   json:"firstResponseAt"`
-	Tags              pq.StringArray `db:"tags"                json:"tags"`
-	FollowUpAt        *time.Time     `db:"follow_up_at"        json:"followUpAt"`
-	OutcomeAmountCLP  NullInt64      `db:"outcome_amount_clp"  json:"outcomeAmountClp"`
-	CreatedAt         time.Time      `db:"created_at"          json:"createdAt"`
+	ID               string         `db:"id"                  json:"id"`
+	RequesterName    string         `db:"requester_name"      json:"requesterName"`
+	RequesterCompany NullString     `db:"requester_company"   json:"requesterCompany"`
+	RequesterEmail   string         `db:"requester_email"     json:"requesterEmail"`
+	RequesterPhone   NullString     `db:"requester_phone"     json:"requesterPhone"`
+	Service          string         `db:"service"             json:"service"`
+	Description      NullString     `db:"description"         json:"description"`
+	Location         NullString     `db:"location"            json:"location"`
+	TargetCompanyID  NullString     `db:"target_company_id"   json:"targetCompanyId"`
+	Status           string         `db:"status"              json:"status"`
+	ReplyNote        NullString     `db:"reply_note"          json:"replyNote"`
+	RepliedAt        *time.Time     `db:"replied_at"          json:"repliedAt"`
+	Outcome          NullString     `db:"outcome"             json:"outcome"`
+	OutcomeNote      NullString     `db:"outcome_note"        json:"outcomeNote"`
+	ClosedAt         *time.Time     `db:"closed_at"           json:"closedAt"`
+	FirstResponseAt  *time.Time     `db:"first_response_at"   json:"firstResponseAt"`
+	Tags             pq.StringArray `db:"tags"                json:"tags"`
+	FollowUpAt       *time.Time     `db:"follow_up_at"        json:"followUpAt"`
+	OutcomeAmountCLP NullInt64      `db:"outcome_amount_clp"  json:"outcomeAmountClp"`
+	CreatedAt        time.Time      `db:"created_at"          json:"createdAt"`
 }
 
 // Analytics models
@@ -214,6 +239,17 @@ type ProviderRegistration struct {
 	Description NullString     `db:"description"  json:"description"`
 	Status      string         `db:"status"       json:"status"`
 	CreatedAt   time.Time      `db:"created_at"   json:"createdAt"`
+
+	// Vínculo explícito con lo que creó la aprobación. Reemplaza la
+	// búsqueda por correo, que podía apuntar a la empresa equivocada.
+	CompanyID   NullString `db:"company_id"   json:"companyId"`
+	UserID      NullString `db:"user_id"      json:"userId"`
+	ApprovedAt  NullTime   `db:"approved_at"  json:"approvedAt"`
+	EmailStatus NullString `db:"email_status" json:"emailStatus"`
+	EmailNote   NullString `db:"email_note"   json:"emailNote"`
+
+	RejectionReason NullString `db:"rejection_reason" json:"rejectionReason"`
+	RejectedAt      NullTime   `db:"rejected_at"      json:"rejectedAt"`
 }
 
 // Static data types (not stored in DB)

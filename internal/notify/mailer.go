@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"net/smtp"
 	"strings"
@@ -42,6 +43,32 @@ Contraseña inicial: %s
 
 Por seguridad, al ingresar deberás cambiar tu contraseña inmediatamente.
 `, companyName, strings.TrimRight(m.cfg.AppBaseURL, "/"), to, initialPassword))
+
+	return m.send(to, subject, body)
+}
+
+// SendRejectionEmail avisa al proveedor que su solicitud no fue aprobada.
+// El motivo es opcional: si el admin no escribió ninguno, el correo sale sin
+// esa sección en vez de dejar un hueco vacío.
+func (m *Mailer) SendRejectionEmail(to, companyName, reason string) DeliveryResult {
+	subject := "Sobre tu solicitud de registro en PuntoFusión"
+
+	reasonBlock := ""
+	if r := strings.TrimSpace(reason); r != "" {
+		reasonBlock = fmt.Sprintf("\n\nMotivo:\n%s", r)
+	}
+
+	body := strings.TrimSpace(fmt.Sprintf(`
+Hola,
+
+Revisamos la solicitud de registro de %s en PuntoFusión y, por ahora, no pudimos aprobarla.%s
+
+Si crees que se trata de un error, o quieres corregir la información y volver a postular, escríbenos a contacto@puntofusion.cl y lo revisamos contigo.
+
+Gracias por tu interés.
+
+— El equipo de PuntoFusión
+`, companyName, reasonBlock))
 
 	return m.send(to, subject, body)
 }
@@ -169,16 +196,30 @@ func (m *Mailer) send(to, subject, body string) DeliveryResult {
 	return DeliveryResult{Status: "sent", Note: fmt.Sprintf("Correo enviado a %s.", to)}
 }
 
+// sanitizeHeader evita la inyección de cabeceras: parte del asunto viene
+// de campos que rellena el público (por ejemplo el servicio de una
+// cotización), y un \r\n permitiría añadir un Bcc arbitrario.
+func sanitizeHeader(s string) string {
+	return strings.NewReplacer("\r", " ", "\n", " ").Replace(s)
+}
+
+// smtpDialTimeout acota la conexión SMTP. Sin él, un servidor que acepta
+// la conexión y se queda colgado dejaba el request de aprobación pendiente
+// indefinidamente, después de que la empresa ya se había creado.
+const smtpDialTimeout = 10 * time.Second
+
 func (m *Mailer) smtpSend(to, subject, body string) error {
-	addr := fmt.Sprintf("%s:%s", m.cfg.SMTPHost, m.cfg.SMTPPort)
-	raw := []byte(fmt.Sprintf("From: %s\r\nTo: %s\r\nSubject: %s\r\n\r\n%s\r\n",
-		m.cfg.SMTPFrom, to, subject, body))
+	addr := net.JoinHostPort(m.cfg.SMTPHost, m.cfg.SMTPPort)
+	raw := []byte(fmt.Sprintf("From: %s\r\nTo: %s\r\nSubject: %s\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\n%s\r\n",
+		sanitizeHeader(m.cfg.SMTPFrom), sanitizeHeader(to), sanitizeHeader(subject), body))
 
 	if m.cfg.SMTPPort == "465" {
-		conn, err := tls.Dial("tcp", addr, &tls.Config{ServerName: m.cfg.SMTPHost})
+		dialer := &net.Dialer{Timeout: smtpDialTimeout}
+		conn, err := tls.DialWithDialer(dialer, "tcp", addr, &tls.Config{ServerName: m.cfg.SMTPHost})
 		if err != nil {
 			return err
 		}
+		_ = conn.SetDeadline(time.Now().Add(30 * time.Second))
 		c, err := smtp.NewClient(conn, m.cfg.SMTPHost)
 		if err != nil {
 			return err
@@ -208,11 +249,46 @@ func (m *Mailer) smtpSend(to, subject, body string) error {
 		return c.Quit()
 	}
 
-	var auth smtp.Auth
-	if m.cfg.SMTPUser != "" {
-		auth = smtp.PlainAuth("", m.cfg.SMTPUser, m.cfg.SMTPPass, m.cfg.SMTPHost)
+	// smtp.SendMail no acepta timeout, así que se abre la conexión a mano.
+	conn, err := net.DialTimeout("tcp", addr, smtpDialTimeout)
+	if err != nil {
+		return err
 	}
-	return smtp.SendMail(addr, auth, m.cfg.SMTPFrom, []string{to}, raw)
+	_ = conn.SetDeadline(time.Now().Add(30 * time.Second))
+
+	c, err := smtp.NewClient(conn, m.cfg.SMTPHost)
+	if err != nil {
+		return err
+	}
+	defer c.Close()
+
+	if ok, _ := c.Extension("STARTTLS"); ok {
+		if err := c.StartTLS(&tls.Config{ServerName: m.cfg.SMTPHost}); err != nil {
+			return err
+		}
+	}
+	if m.cfg.SMTPUser != "" {
+		if err := c.Auth(smtp.PlainAuth("", m.cfg.SMTPUser, m.cfg.SMTPPass, m.cfg.SMTPHost)); err != nil {
+			return err
+		}
+	}
+	if err := c.Mail(m.cfg.SMTPFrom); err != nil {
+		return err
+	}
+	if err := c.Rcpt(to); err != nil {
+		return err
+	}
+	wc, err := c.Data()
+	if err != nil {
+		return err
+	}
+	if _, err := wc.Write(raw); err != nil {
+		return err
+	}
+	if err := wc.Close(); err != nil {
+		return err
+	}
+	return c.Quit()
 }
 
 func textToHTML(text string) string {

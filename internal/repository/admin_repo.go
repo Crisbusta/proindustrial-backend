@@ -1,9 +1,12 @@
 package repository
 
 import (
+	"database/sql"
+	"errors"
 	"fmt"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/crisbusta/proindustrial-backend-public/internal/model"
 	"github.com/jmoiron/sqlx"
@@ -61,14 +64,21 @@ func (r *AdminRepo) ApproveRegistration(id, passwordHash, initialPassword string
 	var reg model.ProviderRegistration
 	err = tx.Get(&reg, `SELECT * FROM provider_registrations WHERE id = $1 FOR UPDATE`, id)
 	if err != nil {
-		return nil, ErrRegistrationNotFound
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrRegistrationNotFound
+		}
+		// Un fallo de conexión o de bloqueo no es un "no encontrado":
+		// devolverlo como 404 mandaba al admin a buscar un registro que sí existe.
+		return nil, err
 	}
 	if reg.Status != "pending" {
 		return nil, ErrRegistrationAlreadyDone
 	}
 
+	email := strings.ToLower(strings.TrimSpace(reg.Email))
+
 	var existingCount int
-	if err := tx.Get(&existingCount, `SELECT COUNT(*) FROM users WHERE email = $1`, reg.Email); err != nil {
+	if err := tx.Get(&existingCount, `SELECT COUNT(*) FROM users WHERE lower(email) = $1`, email); err != nil {
 		return nil, err
 	}
 	if existingCount > 0 {
@@ -91,13 +101,13 @@ func (r *AdminRepo) ApproveRegistration(id, passwordHash, initialPassword string
 		RETURNING `+companyCols,
 		slug,
 		reg.CompanyName,
-		reg.Description,
+		truncatedDescription(reg.Description),
 		reg.Region,
 		reg.Region,
 		categories,
 		serviceLabels,
 		reg.Phone,
-		reg.Email,
+		email,
 	).StructScan(&company)
 	if err != nil {
 		return nil, err
@@ -108,7 +118,7 @@ func (r *AdminRepo) ApproveRegistration(id, passwordHash, initialPassword string
 		INSERT INTO users (email, password_hash, company_id, role, must_change_password)
 		VALUES ($1, $2, $3, 'provider', true)
 		RETURNING *`,
-		reg.Email,
+		email,
 		passwordHash,
 		company.ID,
 	).StructScan(&user)
@@ -118,10 +128,10 @@ func (r *AdminRepo) ApproveRegistration(id, passwordHash, initialPassword string
 
 	err = tx.Get(&reg, `
 		UPDATE provider_registrations
-		SET status = 'approved'
+		SET status = 'approved', company_id = $2, user_id = $3, approved_at = $4, email = $5
 		WHERE id = $1
 		RETURNING *`,
-		id,
+		id, company.ID, user.ID, time.Now(), email,
 	)
 	if err != nil {
 		return nil, err
@@ -139,19 +149,28 @@ func (r *AdminRepo) ApproveRegistration(id, passwordHash, initialPassword string
 	}, nil
 }
 
-func (r *AdminRepo) RejectRegistration(id string) (*model.ProviderRegistration, error) {
+// RejectRegistration marca el registro como rechazado y guarda el motivo.
+// El motivo es opcional; queda registrado para que la decisión sea auditable.
+func (r *AdminRepo) RejectRegistration(id, reason string) (*model.ProviderRegistration, error) {
 	var reg model.ProviderRegistration
 	err := r.db.Get(&reg, `
 		UPDATE provider_registrations
-		SET status = 'rejected'
+		SET status = 'rejected', rejection_reason = $2, rejected_at = $3
 		WHERE id = $1 AND status = 'pending'
 		RETURNING *`,
-		id,
+		id, nullableStr(reason), time.Now(),
 	)
 	if err != nil {
+		if !errors.Is(err, sql.ErrNoRows) {
+			return nil, err
+		}
+		// Cero filas: o el id no existe, o el registro ya no está pendiente.
 		checkErr := r.db.Get(&reg, `SELECT * FROM provider_registrations WHERE id = $1`, id)
 		if checkErr != nil {
-			return nil, ErrRegistrationNotFound
+			if errors.Is(checkErr, sql.ErrNoRows) {
+				return nil, ErrRegistrationNotFound
+			}
+			return nil, checkErr
 		}
 		return nil, ErrRegistrationAlreadyDone
 	}
@@ -167,21 +186,49 @@ func (r *AdminRepo) DeleteApprovedCompanyByRegistration(id string) error {
 
 	var reg model.ProviderRegistration
 	if err := tx.Get(&reg, `SELECT * FROM provider_registrations WHERE id = $1 FOR UPDATE`, id); err != nil {
-		return ErrRegistrationNotFound
+		if errors.Is(err, sql.ErrNoRows) {
+			return ErrRegistrationNotFound
+		}
+		return err
 	}
 	if reg.Status != "approved" {
 		return ErrApprovedCompanyNotFound
 	}
 
-	var companyID string
-	if err := tx.Get(&companyID, `SELECT id FROM companies WHERE email = $1`, reg.Email); err != nil {
+	// El vínculo autoritativo es company_id, que la aprobación guarda.
+	// Buscar por correo podía quedarse sin resultado (si el proveedor
+	// cambió su email en el panel) o devolver la empresa equivocada
+	// (companies.email no es único). El camino por correo se conserva
+	// solo para registros aprobados antes de la migración 011, y exige
+	// que la coincidencia sea inequívoca.
+	companyID := ""
+	if reg.CompanyID.Valid {
+		companyID = reg.CompanyID.String
+	} else {
+		var matches []string
+		if err := tx.Select(&matches, `SELECT id FROM companies WHERE lower(email) = lower($1)`, reg.Email); err != nil {
+			return err
+		}
+		if len(matches) != 1 {
+			return ErrApprovedCompanyNotFound
+		}
+		companyID = matches[0]
+	}
+
+	var exists int
+	if err := tx.Get(&exists, `SELECT COUNT(*) FROM companies WHERE id = $1`, companyID); err != nil {
+		return err
+	}
+	if exists == 0 {
 		return ErrApprovedCompanyNotFound
 	}
 
 	if _, err := tx.Exec(`DELETE FROM quote_requests WHERE target_company_id = $1`, companyID); err != nil {
 		return err
 	}
-	if _, err := tx.Exec(`DELETE FROM users WHERE email = $1`, reg.Email); err != nil {
+	// Por company_id, no por correo: así no se arrastra a un usuario
+	// ajeno que casualmente comparta dirección.
+	if _, err := tx.Exec(`DELETE FROM users WHERE company_id = $1`, companyID); err != nil {
 		return err
 	}
 	if _, err := tx.Exec(`DELETE FROM companies WHERE id = $1`, companyID); err != nil {
@@ -213,11 +260,102 @@ func nextCompanySlug(tx *sqlx.Tx, companyName string) (string, error) {
 	}
 }
 
+// slugReplacer translitera los acentos del castellano antes de filtrar.
+// Sin esto, "Tuberías del Sur" quedaba como "tuber-as-del-sur".
+var slugReplacer = strings.NewReplacer(
+	"á", "a", "é", "e", "í", "i", "ó", "o", "ú", "u", "ü", "u", "ñ", "n",
+	"Á", "a", "É", "e", "Í", "i", "Ó", "o", "Ú", "u", "Ü", "u", "Ñ", "n",
+	"à", "a", "è", "e", "ì", "i", "ò", "o", "ù", "u", "ç", "c",
+)
+
 func slugify(value string) string {
-	slug := strings.ToLower(strings.TrimSpace(value))
+	slug := strings.ToLower(strings.TrimSpace(slugReplacer.Replace(value)))
 	slug = nonSlugCharPattern.ReplaceAllString(slug, "-")
 	slug = strings.Trim(slug, "-")
+	// companies.slug es VARCHAR(100): sin truncar, un nombre largo
+	// hacía fallar el INSERT con un 500 opaco justo al aprobar.
+	if len(slug) > model.MaxSlugBase {
+		slug = strings.Trim(slug[:model.MaxSlugBase], "-")
+	}
 	return slug
+}
+
+// truncatedDescription recorta al tope canónico. Los registros anteriores
+// a la migración 011 pueden exceder el límite y, sin recorte, el INSERT en
+// companies fallaba contra el CHECK o contra el tope de 1 MB del tsvector
+// generado, dejando esos registros imposibles de aprobar.
+func truncatedDescription(d model.NullString) model.NullString {
+	if !d.Valid {
+		return d
+	}
+	runes := []rune(d.String)
+	if len(runes) <= model.MaxDescription {
+		return d
+	}
+	d.String = strings.TrimSpace(string(runes[:model.MaxDescription]))
+	return d
+}
+
+// SetEmailStatus registra el resultado del envío del correo de acceso.
+// Se persiste para que el admin pueda ver después si llegó o no, en vez
+// de depender de un banner que desaparece al recargar.
+func (r *AdminRepo) SetEmailStatus(registrationID, status, note string) error {
+	_, err := r.db.Exec(`
+		UPDATE provider_registrations
+		SET email_status = $2, email_note = $3
+		WHERE id = $1`, registrationID, status, note)
+	return err
+}
+
+// ResetInitialPassword genera un acceso nuevo para un registro ya aprobado.
+// Es la salida cuando el correo no llegó o la contraseña inicial se perdió.
+func (r *AdminRepo) ResetInitialPassword(registrationID, passwordHash string) (*ApproveRegistrationResult, error) {
+	tx, err := r.db.Beginx()
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	var reg model.ProviderRegistration
+	if err := tx.Get(&reg, `SELECT * FROM provider_registrations WHERE id = $1 FOR UPDATE`, registrationID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrRegistrationNotFound
+		}
+		return nil, err
+	}
+	if reg.Status != "approved" {
+		return nil, ErrApprovedCompanyNotFound
+	}
+
+	var user model.User
+	query := `UPDATE users SET password_hash = $1, must_change_password = true WHERE id = $2 RETURNING *`
+	arg := reg.UserID.String
+	if !reg.UserID.Valid {
+		// Registros aprobados antes de la migración 011.
+		query = `UPDATE users SET password_hash = $1, must_change_password = true WHERE lower(email) = lower($2) RETURNING *`
+		arg = reg.Email
+	}
+	if err := tx.QueryRowx(query, passwordHash, arg).StructScan(&user); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrApprovedCompanyNotFound
+		}
+		return nil, err
+	}
+
+	var company model.Company
+	if err := tx.Get(&company, `SELECT `+companyCols+` FROM companies WHERE id = $1`, user.CompanyID); err != nil {
+		return nil, err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+
+	return &ApproveRegistrationResult{
+		Registration: reg,
+		Company:      company,
+		User:         user,
+	}, nil
 }
 
 func categoryNames(slugs []string) []string {

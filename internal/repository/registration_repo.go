@@ -23,7 +23,25 @@ type CreateRegistrationInput struct {
 	Description string
 }
 
+// PendingExists indica si ya hay una solicitud en revisión para ese correo.
+// El correo debe venir normalizado en minúsculas.
+func (r *RegistrationRepo) PendingExists(email string) (bool, error) {
+	var n int
+	err := r.db.Get(&n, `
+		SELECT COUNT(*) FROM provider_registrations
+		WHERE lower(email) = $1 AND status = 'pending'`, email)
+	return n > 0, err
+}
+
 func (r *RegistrationRepo) Create(in CreateRegistrationInput) (*model.ProviderRegistration, error) {
+	// Un slice nil se inserta como NULL explícito y anula el DEFAULT '{}'
+	// de la columna. Al leerlo, el JSON sale como "services": null y el
+	// panel del admin —que asume un array— se cae entero.
+	services := in.Services
+	if services == nil {
+		services = []string{}
+	}
+
 	var reg model.ProviderRegistration
 	err := r.db.QueryRowx(`
 		INSERT INTO provider_registrations
@@ -34,7 +52,7 @@ func (r *RegistrationRepo) Create(in CreateRegistrationInput) (*model.ProviderRe
 		in.Email,
 		nullableStr(in.Phone),
 		nullableStr(in.Region),
-		pq.StringArray(in.Services),
+		pq.StringArray(services),
 		nullableStr(in.Description),
 	).StructScan(&reg)
 	return &reg, err

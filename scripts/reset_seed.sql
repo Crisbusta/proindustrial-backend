@@ -1,7 +1,8 @@
 -- ============================================================
 -- RESET + RE-SEED de base de datos PuntoFusión
--- Contraseña de todos los usuarios: demo123
--- Admin: admin@puntofusion.local / demo123
+-- Contraseña de los usuarios de demo: ver el hash bcrypt más abajo.
+-- Admin de DESARROLLO: admin@puntofusion.local
+-- ADVERTENCIA: no ejecutar este script contra la base de producción.
 --
 -- Correr en Railway → PostgreSQL → Data (editor SQL)
 -- ============================================================
@@ -101,7 +102,7 @@ INSERT INTO companies (slug, name, tagline, description, location, region, categ
   '+56 32 255 1199', 'licitaciones@montajesvalparaiso.cl', 22, true
 );
 
--- 3. Usuarios proveedor (password = "demo123")
+-- 3. Usuarios proveedor de demo (hash bcrypt fijo, solo desarrollo)
 INSERT INTO users (email, password_hash, company_id, role, must_change_password) VALUES
   ('contacto@acerospacifico.cl',         '$2a$10$r1zFxutzHJAHUYG.5UCOdeh4AyJru1vWjfhG3sklvd9Ml0JTILRWy', (SELECT id FROM companies WHERE slug='proveedora-aceros-pacifico'), 'provider', false),
   ('proyectos@tuberiasdelsur.cl',        '$2a$10$r1zFxutzHJAHUYG.5UCOdeh4AyJru1vWjfhG3sklvd9Ml0JTILRWy', (SELECT id FROM companies WHERE slug='tuberias-del-sur'),           'provider', false),
@@ -112,7 +113,7 @@ INSERT INTO users (email, password_hash, company_id, role, must_change_password)
   ('info@fusionespacifico.cl',           '$2a$10$r1zFxutzHJAHUYG.5UCOdeh4AyJru1vWjfhG3sklvd9Ml0JTILRWy', (SELECT id FROM companies WHERE slug='fusiones-pacifico'),          'provider', false),
   ('licitaciones@montajesvalparaiso.cl', '$2a$10$r1zFxutzHJAHUYG.5UCOdeh4AyJru1vWjfhG3sklvd9Ml0JTILRWy', (SELECT id FROM companies WHERE slug='montajes-valparaiso'),        'provider', false);
 
--- 4. Usuario admin (password = "demo123")
+-- 4. Usuario admin de desarrollo (hash bcrypt fijo, solo desarrollo)
 INSERT INTO users (email, password_hash, company_id, role, must_change_password) VALUES
   ('admin@puntofusion.local', '$2a$10$r1zFxutzHJAHUYG.5UCOdeh4AyJru1vWjfhG3sklvd9Ml0JTILRWy', NULL, 'admin', false);
 

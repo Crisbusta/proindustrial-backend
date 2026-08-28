@@ -81,15 +81,12 @@ Admin:
 
 ## Credenciales seed
 
-Admin local:
+Las cuentas sembradas por las migraciones son **solo para entorno local**.
+Su contraseña no se versiona en el repositorio: pídela al responsable del
+entorno o rótala con un hash bcrypt propio.
 
-- `admin@proindustrial.local`
-- `demo123`
-
-Proveedor demo:
-
-- `contacto@acerospacifico.cl`
-- `demo123`
+En producción, el usuario administrador debe tener una contraseña rotada
+manualmente; la sembrada por la migración `003` nunca debe seguir en uso.
 
 ## Flujo de aprobación
 
@@ -97,7 +94,7 @@ Proveedor demo:
 2. El registro queda en `pending`.
 3. Un admin entra al backoffice y aprueba.
 4. El backend crea la empresa y el usuario proveedor.
-5. El proveedor recibe contraseña temporal `demo123`.
+5. El proveedor recibe una contraseña temporal generada al azar con `crypto/rand`.
 6. En el primer login debe cambiarla antes de usar el panel.
 7. Si `RESEND_API_KEY` y `RESEND_FROM` están configurados, el correo sale por Resend.
 8. Si Resend no está configurado pero SMTP sí, usa SMTP.

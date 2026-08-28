@@ -2,6 +2,9 @@ package main
 
 import (
 	"log/slog"
+	"net/http"
+	"strings"
+	"time"
 
 	"github.com/crisbusta/proindustrial-backend-public/internal/config"
 	"github.com/crisbusta/proindustrial-backend-public/internal/database"
@@ -18,14 +21,14 @@ func main() {
 	logger.Init(cfg.AppEnv)
 
 	store, err := storage.New(storage.Config{
-		Driver:      cfg.StorageDriver,
-		BaseURL:     cfg.AppBaseURL + "/uploads",
-		Dir:         cfg.StorageDir,
-		S3Bucket:    cfg.S3Bucket,
-		S3Region:    cfg.S3Region,
-		S3Endpoint:  cfg.S3Endpoint,
-		S3AccessKey: cfg.S3AccessKey,
-		S3SecretKey: cfg.S3SecretKey,
+		Driver:       cfg.StorageDriver,
+		BaseURL:      cfg.AppBaseURL + "/uploads",
+		Dir:          cfg.StorageDir,
+		S3Bucket:     cfg.S3Bucket,
+		S3Region:     cfg.S3Region,
+		S3Endpoint:   cfg.S3Endpoint,
+		S3AccessKey:  cfg.S3AccessKey,
+		S3SecretKey:  cfg.S3SecretKey,
 		S3PublicBase: cfg.S3PublicBase,
 	})
 	if err != nil {
@@ -53,7 +56,7 @@ func main() {
 	quoteHandler := handler.NewQuoteHandler(quoteRepo, companyRepo, mailer)
 	registrationHandler := handler.NewRegistrationHandler(registrationRepo)
 	panelHandler := handler.NewPanelHandler(serviceRepo, quoteRepo, companyRepo)
-	adminHandler := handler.NewAdminHandler(adminRepo, mailer, cfg.InitialPassword)
+	adminHandler := handler.NewAdminHandler(adminRepo, mailer, cfg.InitialPassword, cfg.AppEnv)
 	healthHandler := handler.NewHealthHandler(db)
 	mediaHandler := handler.NewMediaHandler(mediaRepo, companyRepo, store)
 	analyticsHandler := handler.NewAnalyticsHandler(eventRepo, companyRepo)
@@ -72,10 +75,35 @@ func main() {
 		StorageDir:   cfg.StorageDir,
 		JWTSecret:    cfg.JWTSecret,
 		CORSOrigin:   cfg.CORSOrigin,
+
+		TrustedPlatform: cfg.TrustedPlatform,
+		TrustedProxies:  splitList(cfg.TrustedProxies),
 	})
 
+	// r.Run usa los defaults de net/http, que no traen ningún timeout: una
+	// conexión lenta o colgada podía retener un handler indefinidamente.
+	srv := &http.Server{
+		Addr:              ":" + cfg.Port,
+		Handler:           r,
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      60 * time.Second,
+		IdleTimeout:       120 * time.Second,
+	}
+
 	slog.Info("server starting", "port", cfg.Port, "env", cfg.AppEnv)
-	if err := r.Run(":" + cfg.Port); err != nil {
+	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		slog.Error("server failed", "err", err)
 	}
+}
+
+// splitList parsea una lista separada por comas, ignorando espacios y vacíos.
+func splitList(raw string) []string {
+	out := []string{}
+	for _, part := range strings.Split(raw, ",") {
+		if p := strings.TrimSpace(part); p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
 }

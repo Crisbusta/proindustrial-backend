@@ -1,10 +1,12 @@
 package router
 
 import (
+	"log/slog"
 	"net/http"
 
 	"github.com/crisbusta/proindustrial-backend-public/internal/handler"
 	"github.com/crisbusta/proindustrial-backend-public/internal/middleware"
+	"github.com/crisbusta/proindustrial-backend-public/internal/model"
 	"github.com/crisbusta/proindustrial-backend-public/internal/storage"
 	"github.com/gin-gonic/gin"
 )
@@ -23,14 +25,33 @@ type Deps struct {
 	StorageDir   string
 	JWTSecret    string
 	CORSOrigin   string
+
+	TrustedPlatform string
+	TrustedProxies  []string
 }
 
 func Setup(deps Deps) *gin.Engine {
 	r := gin.New()
+
+	// Por defecto gin acepta el X-Forwarded-For de cualquier origen, lo que
+	// permite evadir el rate limit por IP rotando la cabecera. Declarar la
+	// plataforma o los proxies reales hace que ClientIP() no sea falsificable.
+	switch {
+	case deps.TrustedPlatform != "":
+		r.TrustedPlatform = deps.TrustedPlatform
+	case len(deps.TrustedProxies) > 0:
+		if err := r.SetTrustedProxies(deps.TrustedProxies); err != nil {
+			slog.Error("SetTrustedProxies inválido, se mantiene el comportamiento por defecto", "err", err)
+		}
+	default:
+		slog.Warn("TRUSTED_PLATFORM / TRUSTED_PROXIES sin configurar: el rate limit por IP se puede evadir falsificando X-Forwarded-For")
+	}
+
 	r.Use(gin.Recovery())
 	r.Use(middleware.RequestID())
 	r.Use(middleware.CORS(deps.CORSOrigin))
 	r.Use(middleware.Security())
+	r.Use(middleware.BodyLimit(25 << 20)) // 25 MB: techo global, deja pasar las subidas de imágenes
 
 	// Health (no auth, no rate limit)
 	r.GET("/healthz", deps.Health.Healthz)
@@ -46,7 +67,11 @@ func Setup(deps Deps) *gin.Engine {
 	api := r.Group("/api")
 
 	// Public
-	api.POST("/events", deps.Analytics.TrackEvent)
+	publicWrite := []gin.HandlerFunc{middleware.PublicWriteLimit(), middleware.BodyLimit(model.MaxBodyBytes)}
+
+	// /events no lleva PublicWriteLimit: se dispara en cada vista de página
+	// y un límite estrecho devolvería 429 a la navegación normal.
+	api.POST("/events", middleware.EventLimit(), middleware.BodyLimit(model.MaxBodyBytes), deps.Analytics.TrackEvent)
 	api.GET("/category-groups", handler.GetCategoryGroups)
 	api.GET("/regions", handler.GetRegions)
 	api.GET("/companies", deps.Company.List)
@@ -54,8 +79,8 @@ func Setup(deps Deps) *gin.Engine {
 	api.GET("/companies/:slug/services", deps.Company.ListServices)
 	api.GET("/companies/:slug/certifications", deps.Media.GetPublicCertifications)
 	api.GET("/companies/:slug/projects", deps.Media.GetPublicProjects)
-	api.POST("/quotes", deps.Quote.Create)
-	api.POST("/registrations", deps.Registration.Create)
+	api.POST("/quotes", append(publicWrite, deps.Quote.Create)...)
+	api.POST("/registrations", append(publicWrite, deps.Registration.Create)...)
 
 	// Auth (rate-limited)
 	api.POST("/auth/login", middleware.RateLimit(), deps.Auth.Login)
@@ -118,6 +143,7 @@ func Setup(deps Deps) *gin.Engine {
 	admin.GET("/registrations/:id", deps.Admin.GetRegistration)
 	admin.POST("/registrations/:id/approve", deps.Admin.ApproveRegistration)
 	admin.POST("/registrations/:id/reject", deps.Admin.RejectRegistration)
+	admin.POST("/registrations/:id/resend-credentials", deps.Admin.ResendCredentials)
 	admin.DELETE("/registrations/:id/company", deps.Admin.DeleteApprovedCompany)
 
 	return r

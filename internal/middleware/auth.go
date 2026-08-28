@@ -8,10 +8,15 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-// Routes exempt from the mustChangePassword check
+// Routes exempt from the mustChangePassword check.
+// Las rutas de admin también deben estar aquí: sin ellas, un admin con el
+// flag activo recibía 403 en todo, incluida la única ruta que le permitiría
+// desbloquearse — justo el mecanismo necesario para forzar una rotación.
 var passwordChangeExemptRoutes = map[string]bool{
-	"/api/auth/change-password": true,
-	"/api/auth/me":              true,
+	"/api/auth/change-password":       true,
+	"/api/auth/me":                    true,
+	"/api/admin/auth/change-password": true,
+	"/api/admin/auth/me":              true,
 }
 
 const UserIDKey = "userID"

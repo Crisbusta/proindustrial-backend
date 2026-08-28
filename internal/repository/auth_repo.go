@@ -15,7 +15,11 @@ func NewAuthRepo(db *sqlx.DB) *AuthRepo {
 
 func (r *AuthRepo) GetByEmail(email string) (*model.User, error) {
 	var u model.User
-	err := r.db.Get(&u, `SELECT * FROM users WHERE email = $1`, email)
+	// Comparación insensible a mayúsculas: el registro y la aprobación ya
+	// normalizan a minúsculas, pero esto cubre las filas históricas que la
+	// migración 011 no pudo normalizar por colisión. Usa el índice funcional
+	// users_email_lower_uniq.
+	err := r.db.Get(&u, `SELECT * FROM users WHERE lower(email) = lower($1)`, email)
 	if err != nil {
 		return nil, err
 	}

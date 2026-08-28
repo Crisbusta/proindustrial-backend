@@ -14,6 +14,8 @@ type Config struct {
 	InitialPassword string
 	Port            string
 	CORSOrigin      string
+	TrustedPlatform string
+	TrustedProxies  string
 	ResendAPIKey    string
 	ResendFrom      string
 	SMTPHost        string
@@ -24,14 +26,14 @@ type Config struct {
 	AppBaseURL      string
 
 	// Storage
-	StorageDriver   string // "local" (default) | "s3"
-	StorageDir      string // local only: path to uploads dir
-	S3Bucket        string
-	S3Region        string
-	S3Endpoint      string // R2: https://<account>.r2.cloudflarestorage.com
-	S3AccessKey     string
-	S3SecretKey     string
-	S3PublicBase    string // CDN base URL for S3/R2
+	StorageDriver string // "local" (default) | "s3"
+	StorageDir    string // local only: path to uploads dir
+	S3Bucket      string
+	S3Region      string
+	S3Endpoint    string // R2: https://<account>.r2.cloudflarestorage.com
+	S3AccessKey   string
+	S3SecretKey   string
+	S3PublicBase  string // CDN base URL for S3/R2
 }
 
 func Load() Config {
@@ -52,6 +54,14 @@ func Load() Config {
 		InitialPassword: getEnv("INITIAL_PASSWORD", ""),
 		Port:            getEnv("PORT", "8080"),
 		CORSOrigin:      getEnv("CORS_ORIGIN", "http://localhost:3001"),
+
+		// Sin uno de estos dos, gin confía en el X-Forwarded-For de
+		// cualquiera y el rate limit por IP se evade con una cabecera.
+		// No se fuerza un valor por defecto porque, detrás de un proxy,
+		// dejar de confiar en la cabecera haría que todo el tráfico
+		// compartiera una sola IP y el límite bloquearía a todo el mundo.
+		TrustedPlatform: getEnv("TRUSTED_PLATFORM", ""),
+		TrustedProxies:  getEnv("TRUSTED_PROXIES", ""),
 		ResendAPIKey:    getEnv("RESEND_API_KEY", ""),
 		ResendFrom:      getEnv("RESEND_FROM", ""),
 		SMTPHost:        getEnv("SMTP_HOST", ""),
@@ -61,14 +71,14 @@ func Load() Config {
 		SMTPFrom:        getEnv("SMTP_FROM", ""),
 		AppBaseURL:      getEnv("APP_BASE_URL", "http://localhost:3001"),
 
-		StorageDriver:   getEnv("STORAGE_DRIVER", "local"),
-		StorageDir:      getEnv("STORAGE_DIR", "./uploads"),
-		S3Bucket:        getEnv("S3_BUCKET", ""),
-		S3Region:        getEnv("S3_REGION", "auto"),
-		S3Endpoint:      getEnv("S3_ENDPOINT", ""),
-		S3AccessKey:     getEnv("S3_ACCESS_KEY", ""),
-		S3SecretKey:     getEnv("S3_SECRET_KEY", ""),
-		S3PublicBase:    getEnv("S3_PUBLIC_BASE", ""),
+		StorageDriver: getEnv("STORAGE_DRIVER", "local"),
+		StorageDir:    getEnv("STORAGE_DIR", "./uploads"),
+		S3Bucket:      getEnv("S3_BUCKET", ""),
+		S3Region:      getEnv("S3_REGION", "auto"),
+		S3Endpoint:    getEnv("S3_ENDPOINT", ""),
+		S3AccessKey:   getEnv("S3_ACCESS_KEY", ""),
+		S3SecretKey:   getEnv("S3_SECRET_KEY", ""),
+		S3PublicBase:  getEnv("S3_PUBLIC_BASE", ""),
 	}
 }
 
